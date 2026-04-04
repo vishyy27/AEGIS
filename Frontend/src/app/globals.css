@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+/* AEGIS Theme */
+
+:root {
+  --background: #020617;
+  --card: #0f172a;
+  --border: #1e293b;
+  --primary: #06b6d4;
+}
+
+body {
+  background: var(--background);
+  color: white;
+  font-family: "Inter", sans-serif;
+}
+
+.aegis-card {
+  @apply bg-[#0f172a] border border-[#1e293b] rounded-xl p-6;
+}

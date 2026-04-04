@@ -1,0 +1,9 @@
+from .dashboard import router as dashboard_router
+from .deployments import router as deployments_router
+from .analysis import router as analysis_router
+from .integrations import router as integrations_router
+from .alerts import router as alerts_router
+from .settings import router as settings_router
+from .environments import router as environments_router
+from .insights import router as insights_router
+from .incidents import router as incidents_router
