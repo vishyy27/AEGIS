@@ -2,15 +2,17 @@
 
 AI-Based Deployment Risk Prediction Platform
 
-AEGIS is an AI-assisted platform designed to analyze software deployment changes and predict potential risks before a deployment occurs. The system integrates with CI/CD pipelines, analyzes commit and deployment characteristics, and produces a risk score that helps engineering teams make safer deployment decisions.
+AEGIS is an AI-assisted platform designed to analyze software deployments and predict potential risks **before deployment occurs**. The system integrates with CI/CD pipelines, analyzes code changes, deployment characteristics, and historical deployment patterns to generate a **deployment risk score and incident alerts**.
 
-The platform provides a backend API capable of receiving deployment metadata from CI/CD systems, processing the data through a risk analysis engine, and storing deployment insights for further analysis and monitoring.
+The platform enables engineering teams to detect unstable deployments early, prevent production failures, and maintain safer release cycles.
+
+AEGIS combines **deployment analytics, change intelligence, and alert intelligence** to provide real-time risk insights during the CI/CD process.
 
 ---
 
-## System Architecture
+# System Architecture
 
-The AEGIS platform follows a modular architecture designed for CI/CD integration and deployment intelligence.
+AEGIS follows a modular micro-service inspired architecture designed for CI/CD intelligence.
 
 CI/CD Pipeline
 ↓
@@ -20,41 +22,82 @@ Security Validation Layer
 ↓
 Payload Normalization
 ↓
+Code Change Intelligence Engine
+↓
 Deployment Risk Analysis Engine
+↓
+Recommendation Engine
+↓
+Alert Intelligence & Incident Detection
 ↓
 Database Storage
 ↓
-API Response
+Analytics Dashboard
 
-The system can be integrated directly into CI/CD workflows such as GitHub Actions, GitLab CI, Jenkins, or other automation pipelines.
+The system can integrate directly with CI/CD platforms such as:
 
----
-
-## Features
-
-Deployment Risk Analysis
-Evaluates deployments based on commit activity, code churn, testing metrics, and historical failure patterns.
-
-CI/CD Webhook Integration
-Receives deployment metadata directly from CI/CD pipelines using a webhook ingestion endpoint.
-
-Security Layer
-Token-based authentication for webhook ingestion and optional signature verification for external integrations.
-
-Deployment Analytics API
-Provides endpoints for analyzing deployments and retrieving deployment data.
-
-Database Persistence
-Stores deployment risk records and historical deployment data for monitoring and analytics.
-
-Swagger API Documentation
-Interactive API documentation for testing and validating endpoints.
+GitHub Actions
+GitLab CI
+Jenkins
+Azure DevOps
 
 ---
 
-## Tech Stack
+# Core Features
 
-### Backend
+### Deployment Risk Analysis
+
+Analyzes deployments using multiple indicators including commit activity, code churn, test coverage, dependency updates, and historical deployment failures.
+
+### Code Change Intelligence
+
+Evaluates file-level changes and identifies high-risk components such as authentication modules, database migrations, or payment systems.
+
+### CI/CD Webhook Integration
+
+Receives deployment metadata from CI/CD pipelines through a webhook ingestion endpoint and automatically triggers risk analysis.
+
+### Alert Intelligence & Incident Detection
+
+Detects risky deployment patterns such as:
+
+• Consecutive high-risk deployments
+• Deployment failure spikes
+• Critical component modifications
+• Sudden increases in deployment risk
+
+Alerts are automatically generated with severity classifications:
+
+LOW
+MEDIUM
+HIGH
+CRITICAL
+
+### Deployment Analytics
+
+Stores deployment risk results and historical deployment data to enable monitoring and trend analysis.
+
+### AI-Driven Recommendations
+
+Provides actionable recommendations to reduce deployment risk and improve release stability.
+
+### Dashboard Visualization
+
+Displays deployment analytics, risk trends, and deployment history through an interactive frontend dashboard.
+
+### Secure Integration Layer
+
+Webhook authentication ensures only authorized CI/CD systems can trigger deployment analysis.
+
+### Interactive API Documentation
+
+Swagger UI is available for testing and validating all backend API endpoints.
+
+---
+
+# Technology Stack
+
+## Backend
 
 Python
 FastAPI
@@ -62,49 +105,49 @@ Pydantic
 SQLAlchemy
 SQLite
 
-### Frontend
+## Frontend
 
 Next.js
 TypeScript
+React
 
-### DevOps
+## DevOps
 
 Docker
 Docker Compose
 
 ---
 
-## API Endpoints
+# API Endpoints
 
-### Analyze Deployment
+## Deployment Risk Analysis
 
 POST /api/analysis/analyze
 
-Analyzes a deployment and calculates a deployment risk score.
+Analyzes deployment metadata and returns a deployment risk score.
 
-Example Request Body
+Example Request
 
 {
-"repo_name": "test/repo",
-"commit_count": 2,
-"files_changed": 4,
-"commit_messages": ["test commit"],
-"deployment_environment": "staging",
+"repo_name": "example/service",
+"commit_count": 4,
+"files_changed": 7,
+"commit_messages": ["fix authentication bug"],
+"deployment_environment": "production",
 "deployment_frequency": 3,
-"code_churn": 120,
-"test_coverage": 75,
-"rollback_plan": true,
+"code_churn": 200,
+"test_coverage": 78,
 "dependency_updates": 1,
 "historical_failures": 0
 }
 
 ---
 
-### CI/CD Webhook Receiver
+## CI/CD Webhook Receiver
 
 POST /api/integrations/webhook
 
-Receives deployment data from CI/CD pipelines and automatically triggers risk analysis.
+Receives deployment data directly from CI/CD pipelines and triggers automatic deployment analysis.
 
 Authentication Header
 
@@ -112,27 +155,51 @@ X-AEGIS-TOKEN: <token>
 
 ---
 
-### Get Deployment
+## Deployment Data
 
+GET /api/deployments
 GET /api/deployments/{deployment_id}
 
-Retrieves stored deployment analysis data.
+Retrieve stored deployment analysis results.
 
 ---
 
-## Project Structure
+## Alerts & Incident Intelligence
+
+GET /api/alerts
+GET /api/alerts/{alert_id}
+GET /api/alerts/incidents
+
+Returns active alerts and aggregated incident patterns detected from deployment history.
+
+---
+
+## Dashboard Analytics
+
+GET /api/dashboard/summary
+
+Provides deployment risk analytics including:
+
+globalRiskScore
+riskTrend
+successRate
+topRiskFactors
+
+---
+
+# Project Structure
 
 AEGIS
 
 backend
 └── app
-    ├── models
-    ├── routers
-    ├── schemas
-    ├── services
-    ├── config.py
-    ├── database.py
-    └── main.py
+├── models
+├── routers
+├── schemas
+├── services
+├── config.py
+├── database.py
+└── main.py
 
 frontend
 ├── src
@@ -144,9 +211,9 @@ README.md
 
 ---
 
-## Running the Project
+# Running the Project
 
-### Backend
+## Backend
 
 cd backend
 pip install -r requirements.txt
@@ -156,13 +223,13 @@ Backend runs on:
 
 http://localhost:8000
 
-API documentation is available at:
+API documentation:
 
 http://localhost:8000/docs
 
 ---
 
-### Frontend
+## Frontend
 
 cd frontend
 npm install
@@ -174,26 +241,32 @@ http://localhost:3000
 
 ---
 
-## Current Implementation Status
+# Development Phases
 
-Completed
+AEGIS was developed in progressive phases:
 
-Core Backend API
-Deployment Risk Analysis Engine
-CI/CD Webhook Integration
-Security Token Authentication
-Deployment Data Persistence
-Swagger API Testing
-
-Planned Enhancements
-
-Machine learning-based deployment risk prediction models
-Deployment risk analytics dashboard
-Real-time CI/CD pipeline monitoring
-Cloud provider integrations
+Phase 1 — Infrastructure & API Layer
+Phase 2 — Deployment Risk Analysis Engine
+Phase 3 — Code Change Intelligence Engine
+Phase 4 — CI/CD Integration Layer
+Phase 5 — Alert Intelligence & Incident Detection System
 
 ---
 
-## Author
+# Future Enhancements
+
+Machine learning based deployment risk prediction models
+
+Real-time CI/CD pipeline monitoring
+
+Cloud provider integrations (AWS, GCP, Azure)
+
+Multi-service deployment impact analysis
+
+Advanced deployment analytics and predictive risk modeling
+
+---
+
+# Author
 
 Vishwas Desai
