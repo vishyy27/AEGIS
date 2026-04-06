@@ -9,6 +9,21 @@ from .database import engine, Base
 # Create DB tables
 Base.metadata.create_all(bind=engine)
 
+# Create performance indexes for Phase 5 alert intelligence
+from sqlalchemy import text
+with engine.connect() as conn:
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_deployments_repo_timestamp ON deployments(repo_name, timestamp DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts(timestamp)",
+        "CREATE INDEX IF NOT EXISTS idx_alerts_affected_service ON alerts(affected_service)",
+    ]
+    for idx in indexes:
+        try:
+            conn.execute(text(idx))
+        except Exception:
+            pass
+    conn.commit()
+
 app = FastAPI(title=settings.PROJECT_NAME)
 
 # CORS

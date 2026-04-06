@@ -19,7 +19,6 @@ class Deployment(Base):
     dependency_updates = Column(Integer, default=0)
     historical_failures = Column(Integer, default=0)
     deployment_frequency = Column(Integer, default=0)
-    risk_score = Column(Float)
     risk_level = Column(String)
     
     # Phase 3 Expansion Columns

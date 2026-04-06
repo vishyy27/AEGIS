@@ -3,10 +3,8 @@ from sqlalchemy.orm import Session
 from ..models.deployment import Deployment
 from ..schemas.analysis_schema import AnalysisRequest, AnalysisResponse
 from .risk_engine import calculate_risk_score
-import sys
-# need to handle recommendation_engine, wait it's in recommendation_engine
 from .recommendation_engine import generate_recommendations
-from .alert_service import check_and_create_alert
+from .alert_service import run_alert_intelligence_pipeline
 from .change_intelligence import analyze_code_changes
 
 def evaluate_deployment(request: AnalysisRequest, db: Session) -> AnalysisResponse:
@@ -61,10 +59,8 @@ def evaluate_deployment(request: AnalysisRequest, db: Session) -> AnalysisRespon
     db.commit()
     db.refresh(deployment)
 
-    # Check and generate alerts using final aggregated risk score
-    check_and_create_alert(
-        db, deployment.id, final_risk_score, request.historical_failures
-    )
+    # Run alert intelligence pipeline (history-aware pattern detection)
+    run_alert_intelligence_pipeline(db, deployment)
 
     return AnalysisResponse(
         deployment_id=deployment.id,
