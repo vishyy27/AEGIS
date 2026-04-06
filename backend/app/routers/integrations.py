@@ -1,10 +1,10 @@
 import hashlib
 import hmac
-import os
 from fastapi import APIRouter, Depends, Request, HTTPException, Security
 from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 from ..database import get_db
+from ..config import settings
 from ..services.cicd_integrations import detect_cicd_platform, normalize_pipeline_payload
 from ..services.analysis_orchestrator import evaluate_deployment
 from pydantic import BaseModel, ValidationError
@@ -17,8 +17,6 @@ api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 # Constants
 MAX_PAYLOAD_SIZE = 1 * 1024 * 1024  # 1MB limit for DOS protection
-AEGIS_SECRET_TOKEN = os.getenv("AEGIS_SECRET_TOKEN", "default-dev-token")
-GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET", "default-github-secret")
 
 async def verify_security(request: Request, api_key: str = Security(api_key_header)):
     # 1. Size Limit Check
@@ -34,14 +32,14 @@ async def verify_security(request: Request, api_key: str = Security(api_key_head
         signature = headers.get("X-Hub-Signature-256")
         if signature:
             expected_signature = "sha256=" + hmac.new(
-                GITHUB_WEBHOOK_SECRET.encode(), body, hashlib.sha256
+                settings.GITHUB_WEBHOOK_SECRET.encode(), body, hashlib.sha256
             ).hexdigest()
             if not hmac.compare_digest(signature, expected_signature):
                 raise HTTPException(status_code=401, detail="Invalid GitHub signature")
             return platform
             
     # 3. Fallback to API Token check for all platforms
-    if api_key != AEGIS_SECRET_TOKEN:
+    if api_key != settings.AEGIS_SECRET_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid or missing X-AEGIS-TOKEN")
         
     return platform
