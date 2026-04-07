@@ -1,6 +1,13 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from datetime import datetime
+
+
+class RecommendationSchema(BaseModel):
+    message: str
+    priority: str
+    category: str
+    affected_module: Optional[str] = None
 
 
 class AnalysisRequest(BaseModel):
@@ -30,3 +37,4 @@ class AnalysisResponse(BaseModel):
     risk_level: str
     risk_factors: List[str]
     recommendations: List[str]
+    context_recommendations: List[RecommendationSchema] = []

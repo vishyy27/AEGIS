@@ -1,10 +1,11 @@
 import json
 from sqlalchemy.orm import Session
 from ..models.deployment import Deployment
+from ..models.alerts import Alert
 from ..schemas.analysis_schema import AnalysisRequest, AnalysisResponse
 from .risk_engine import calculate_risk_score
-from .recommendation_engine import generate_recommendations
-from .alert_service import run_alert_intelligence_pipeline
+from .recommendation_engine import build_recommendation_context, generate_context_recommendations
+from .alert_service import run_alert_intelligence_pipeline, analyze_deployment_history
 from .change_intelligence import analyze_code_changes
 
 def evaluate_deployment(request: AnalysisRequest, db: Session) -> AnalysisResponse:
@@ -29,9 +30,6 @@ def evaluate_deployment(request: AnalysisRequest, db: Session) -> AnalysisRespon
         final_risk_level = "LOW"
 
     combined_risk_factors = deploy_risk_factors + intelligence["risk_categories"]
-
-    # Generate recommendations based on combined risk factors
-    recommendations = generate_recommendations(combined_risk_factors)
 
     # Store deployment in DB
     deployment = Deployment(
@@ -62,10 +60,47 @@ def evaluate_deployment(request: AnalysisRequest, db: Session) -> AnalysisRespon
     # Run alert intelligence pipeline (history-aware pattern detection)
     run_alert_intelligence_pipeline(db, deployment)
 
+    # Phase 6: Recommendation Engine Context & Generation
+    dep_history = analyze_deployment_history(db, request.repo_name)
+    alert_history = db.query(Alert).filter(Alert.affected_service == request.repo_name).order_by(Alert.timestamp.desc()).limit(10).all()
+    
+    rec_context = build_recommendation_context(
+        request.dict(),
+        intelligence,
+        final_risk_score,
+        dep_history,
+        alert_history
+    )
+    
+    structured_recs = generate_context_recommendations(rec_context)
+    
+    # Persist structured recommendations
+    for rec in structured_recs:
+        rec.deployment_id = deployment.id
+        db.add(rec)
+        
+    if structured_recs:
+        top_rec = structured_recs[0]
+        deployment.primary_recommendation_priority = top_rec.priority
+        deployment.primary_recommendation_category = top_rec.category
+        
+    db.commit()
+
+    legacy_recs = [r.message for r in structured_recs]
+    context_recs_out = [
+        {
+            "message": r.message, 
+            "priority": r.priority, 
+            "category": r.category, 
+            "affected_module": r.affected_module
+        } for r in structured_recs
+    ]
+
     return AnalysisResponse(
         deployment_id=deployment.id,
         risk_score=final_risk_score,
         risk_level=final_risk_level,
         risk_factors=combined_risk_factors,
-        recommendations=recommendations,
+        recommendations=legacy_recs,
+        context_recommendations=context_recs_out
     )

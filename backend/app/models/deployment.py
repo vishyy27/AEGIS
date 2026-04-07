@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy.orm import relationship
 from datetime import datetime
 from ..database import Base
 
@@ -34,4 +35,11 @@ class Deployment(Base):
     commit_hash = Column(String, nullable=True)
     deployment_environment = Column(String, nullable=True)
     
+    # Phase 6 Context-Aware AI Recommendation Engine Columns
+    primary_recommendation_priority = Column(String, nullable=True)
+    primary_recommendation_category = Column(String, nullable=True)
+    
     timestamp = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    recommendations = relationship("Recommendation", back_populates="deployment")
