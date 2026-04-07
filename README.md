@@ -13,25 +13,28 @@ AEGIS combines **deployment analytics, change intelligence, alert intelligence, 
 # System Architecture
 
 AEGIS follows a modular service-oriented backend architecture designed for CI/CD intelligence.
+
+```
 CI/CD Pipeline
-↓
+      ↓
 Webhook Receiver
-↓
+      ↓
 Security Validation Layer
-↓
+      ↓
 Payload Normalization
-↓
+      ↓
 Code Change Intelligence Engine
-↓
+      ↓
 Deployment Risk Analysis Engine
-↓
+      ↓
 Alert Intelligence & Incident Detection
-↓
+      ↓
 Context-Aware Recommendation Engine
-↓
+      ↓
 Database Storage
-↓
+      ↓
 Analytics Dashboard
+```
 
 The system can integrate directly with CI/CD platforms such as:
 
@@ -165,35 +168,65 @@ Analyzes deployment metadata and returns a deployment risk score along with inte
   "dependency_updates": 1,
   "historical_failures": 0
 }
-CI/CD Webhook Receiver
+```
 
-POST /api/integrations/webhook
+---
+
+## CI/CD Webhook Receiver
+
+**POST /api/integrations/webhook**
 
 Receives deployment data directly from CI/CD pipelines and triggers automatic deployment analysis.
 
 Authentication Header:
+
+```
 X-AEGIS-TOKEN: <token>
-Deployment Data
+```
+
+---
+
+## Deployment Data
+
+```
 GET /api/deployments
 GET /api/deployments/{deployment_id}
+```
+
 Retrieve stored deployment analysis results.
-Alerts & Incident Intelligence
+
+---
+
+## Alerts & Incident Intelligence
+
+```
 GET /api/alerts
 GET /api/alerts/{alert_id}
 GET /api/alerts/incidents
+```
 
 Returns active alerts and aggregated incident patterns detected from deployment history.
 
-Dashboard Analytics
+---
+
+## Dashboard Analytics
+
+```
 GET /api/dashboard/summary
+```
 
 Provides deployment risk analytics including:
 
-globalRiskScore
-riskTrend
-successRate
-topRiskFactors
-Project Structure
+- globalRiskScore
+- riskTrend
+- successRate
+- topRiskFactors
+
+---
+
+# Project Structure
+
+```
 AEGIS
 │
 ├── backend
@@ -213,43 +246,73 @@ AEGIS
 ├── docker-compose.yml
 ├── Dockerfile
 └── README.md
-Running the Project
-Backend
+```
+
+---
+
+# Running the Project
+
+## Backend
+
+```bash
 cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --reload
+```
 
 Backend runs on:
 
+```
 http://localhost:8000
+```
 
 API documentation:
 
+```
 http://localhost:8000/docs
-Frontend
+```
+
+---
+
+## Frontend
+
+```bash
 cd frontend
 npm install
 npm run dev
+```
 
 Frontend runs on:
 
+```
 http://localhost:3000
-Development Phases
+```
+
+---
+
+# Development Phases
 
 AEGIS was developed in progressive phases:
 
-Phase 1 — Infrastructure & API Layer
-Phase 2 — Deployment Risk Analysis Engine
-Phase 3 — Code Change Intelligence Engine
-Phase 4 — CI/CD Integration Layer
-Phase 5 — Alert Intelligence & Incident Detection System
-Phase 6 — Context-Aware AI Recommendation Engine
-Future Enhancements
-Machine learning based deployment risk prediction models
-Real-time CI/CD pipeline monitoring
-Cloud provider integrations (AWS, GCP, Azure)
-Multi-service deployment impact analysis
-Advanced deployment analytics and predictive risk modeling
-Author
+- Phase 1 — Infrastructure & API Layer
+- Phase 2 — Deployment Risk Analysis Engine
+- Phase 3 — Code Change Intelligence Engine
+- Phase 4 — CI/CD Integration Layer
+- Phase 5 — Alert Intelligence & Incident Detection System
+- Phase 6 — Context-Aware AI Recommendation Engine
+
+---
+
+# Future Enhancements
+
+- Machine learning based deployment risk prediction models
+- Real-time CI/CD pipeline monitoring
+- Cloud provider integrations (AWS, GCP, Azure)
+- Multi-service deployment impact analysis
+- Advanced deployment analytics and predictive risk modeling
+
+---
+
+# Author
 
 Vishwas Desai
