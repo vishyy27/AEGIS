@@ -2,11 +2,11 @@
 
 AI-Based Deployment Risk Prediction Platform
 
-AEGIS is an AI-assisted platform designed to analyze software deployments and predict potential risks **before deployment occurs**. The system integrates with CI/CD pipelines, analyzes code changes, deployment characteristics, and historical deployment patterns to generate a **deployment risk score, intelligent recommendations, and incident alerts**.
+AEGIS is an AI-assisted platform designed to analyze software deployments and predict potential risks **before deployment occurs**. The system integrates with CI/CD pipelines, analyzes code changes, deployment characteristics, and historical deployment patterns to generate a **deployment risk score, intelligent recommendations, incident alerts, and deployment stability insights**.
 
 The platform enables engineering teams to detect unstable deployments early, prevent production failures, and maintain safer release cycles.
 
-AEGIS combines **deployment analytics, change intelligence, alert intelligence, and context-aware recommendations** to provide real-time risk insights during the CI/CD process.
+AEGIS combines **deployment analytics, change intelligence, alert intelligence, context-aware recommendations, and deployment stability analytics** to provide real-time and historical risk insights during the CI/CD process.
 
 ---
 
@@ -31,6 +31,8 @@ Alert Intelligence & Incident Detection
       ↓
 Context-Aware Recommendation Engine
       ↓
+Deployment Stability Analytics Engine
+      ↓
 Database Storage
       ↓
 Analytics Dashboard
@@ -38,10 +40,10 @@ Analytics Dashboard
 
 The system can integrate directly with CI/CD platforms such as:
 
-- GitHub Actions
-- GitLab CI
-- Jenkins
-- Azure DevOps
+* GitHub Actions
+* GitLab CI
+* Jenkins
+* Azure DevOps
 
 ---
 
@@ -69,17 +71,17 @@ Receives deployment metadata from CI/CD pipelines through a webhook ingestion en
 
 Detects risky deployment patterns such as:
 
-- Consecutive high-risk deployments
-- Deployment failure spikes
-- Critical component modifications
-- Sudden increases in deployment risk
+* Consecutive high-risk deployments
+* Deployment failure spikes
+* Critical component modifications
+* Sudden increases in deployment risk
 
 Alerts are automatically generated with severity classifications:
 
-- LOW
-- MEDIUM
-- HIGH
-- CRITICAL
+* LOW
+* MEDIUM
+* HIGH
+* CRITICAL
 
 ---
 
@@ -89,36 +91,74 @@ Generates intelligent deployment guidance by analyzing risk factors, change inte
 
 Recommendations may include:
 
-- Increasing test coverage for high-churn modules
-- Splitting large deployments into smaller releases
-- Verifying dependency compatibility
-- Preparing rollback strategies for unstable services
+* Increasing test coverage for high-churn modules
+* Splitting large deployments into smaller releases
+* Verifying dependency compatibility
+* Preparing rollback strategies for unstable services
 
 Each recommendation is categorized and prioritized to help engineering teams reduce deployment risk.
 
 ---
 
-## Deployment Analytics
+## Deployment Stability Analytics
 
-Stores deployment risk results, recommendations, and historical deployment data to enable monitoring and trend analysis.
+Phase 7 introduces a **Deployment Stability Analytics Engine** that evaluates historical deployment behavior to determine long-term service reliability and deployment health.
+
+Instead of analyzing individual deployments alone, AEGIS now evaluates **deployment stability trends across time windows**, such as:
+
+* Last 24 hours
+* Last 7 days
+* Last 30 days
+
+The analytics engine computes several reliability metrics:
+
+### Deployment Success Rate
+
+Percentage of successful deployments within a defined time window.
+
+### Incident Frequency
+
+Tracks how often deployments trigger incidents using deployment outcomes and incident flags.
+
+### Service Stability Score
+
+Evaluates the long-term reliability of services based on historical failures, alerts, and deployment risk patterns.
+
+### Risk Trend Analysis
+
+Analyzes how deployment risk evolves over time using aggregated historical risk scores.
+
+### Deployment Health Index
+
+A composite reliability metric derived from deployment success rates, risk trends, and incident frequency.
+
+These insights help engineering teams **identify unstable services, monitor deployment reliability, and maintain safer release cycles**.
 
 ---
 
-## Dashboard Visualization
+## Deployment Analytics Dashboard
 
-Displays deployment analytics, risk trends, alerts, and deployment history through an interactive frontend dashboard.
+The platform provides a dashboard that visualizes deployment analytics including:
+
+* Deployment risk trends
+* Incident frequency
+* Deployment success rate
+* Service stability rankings
+* Deployment health index
+
+These insights help teams monitor long-term deployment health across services.
 
 ---
 
 ## Secure Integration Layer
 
-Webhook authentication ensures only authorized CI/CD systems can trigger deployment analysis.
+Webhook authentication ensures that only authorized CI/CD systems can trigger deployment analysis.
 
 ---
 
 ## Interactive API Documentation
 
-Swagger UI is available for testing and validating all backend API endpoints.
+Swagger UI is available for testing and validating backend API endpoints.
 
 ---
 
@@ -126,22 +166,22 @@ Swagger UI is available for testing and validating all backend API endpoints.
 
 ## Backend
 
-- Python
-- FastAPI
-- Pydantic
-- SQLAlchemy
-- SQLite
+* Python
+* FastAPI
+* Pydantic
+* SQLAlchemy
+* SQLite
 
 ## Frontend
 
-- Next.js
-- TypeScript
-- React
+* Next.js
+* TypeScript
+* React
 
 ## DevOps
 
-- Docker
-- Docker Compose
+* Docker
+* Docker Compose
 
 ---
 
@@ -217,10 +257,25 @@ GET /api/dashboard/summary
 
 Provides deployment risk analytics including:
 
-- globalRiskScore
-- riskTrend
-- successRate
-- topRiskFactors
+* globalRiskScore
+* riskTrend
+* successRate
+* deploymentHealthIndex
+* serviceStabilityScore
+* incidentFrequency
+* advancedRiskTrends
+
+---
+
+## Deployment Stability Insights
+
+```
+GET /api/insights/deployment-health
+GET /api/insights/service-stability
+GET /api/insights/risk-trends
+```
+
+Returns long-term deployment reliability metrics derived from historical deployment analytics.
 
 ---
 
@@ -294,22 +349,23 @@ http://localhost:3000
 
 AEGIS was developed in progressive phases:
 
-- Phase 1 — Infrastructure & API Layer
-- Phase 2 — Deployment Risk Analysis Engine
-- Phase 3 — Code Change Intelligence Engine
-- Phase 4 — CI/CD Integration Layer
-- Phase 5 — Alert Intelligence & Incident Detection System
-- Phase 6 — Context-Aware AI Recommendation Engine
+* Phase 1 — Infrastructure & API Layer
+* Phase 2 — Deployment Risk Analysis Engine
+* Phase 3 — Code Change Intelligence Engine
+* Phase 4 — CI/CD Integration Layer
+* Phase 5 — Alert Intelligence & Incident Detection System
+* Phase 6 — Context-Aware AI Recommendation Engine
+* Phase 7 — Deployment Stability Analytics & Reliability Intelligence
 
 ---
 
 # Future Enhancements
 
-- Machine learning based deployment risk prediction models
-- Real-time CI/CD pipeline monitoring
-- Cloud provider integrations (AWS, GCP, Azure)
-- Multi-service deployment impact analysis
-- Advanced deployment analytics and predictive risk modeling
+* Machine learning based deployment risk prediction models
+* Real-time CI/CD pipeline monitoring
+* Cloud provider integrations (AWS, GCP, Azure)
+* Multi-service deployment impact analysis
+* Predictive deployment reliability modeling
 
 ---
 
