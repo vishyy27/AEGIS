@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from ..database import Base
@@ -38,6 +38,10 @@ class Deployment(Base):
     # Phase 6 Context-Aware AI Recommendation Engine Columns
     primary_recommendation_priority = Column(String, nullable=True)
     primary_recommendation_category = Column(String, nullable=True)
+    
+    # Phase 7 Deployment Stability Analytics Columns
+    deployment_outcome = Column(String, nullable=True)
+    incident_flag = Column(Boolean, default=False)
     
     timestamp = Column(DateTime, default=datetime.utcnow)
 

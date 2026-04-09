@@ -9,27 +9,42 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 def get_dashboard_summary(db: Session = Depends(get_db)):
 
     from ..models.deployment import Deployment
-    from sqlalchemy import func
+    from ..services.analytics_engine import generate_health_index, get_all_services_stability, detect_risk_trends
 
     # Query metrics
     deployments = db.query(Deployment).all()
+    
+    # Get advanced analytics from Phase 7 engine
+    health_data = generate_health_index(db, window_hours=720) # 30 days
+    stability_data = get_all_services_stability(db, window_hours=720)
+    
+    # Use 30-day trends for the riskTrend metric as well if possible, or fallback to the previous 5 recent logic depending on what frontend expects. 
+    # The new trends return objects with `date` and `average_risk`. Let's still provide riskTrend as numbers for backward compatibility.
+    
     if not deployments:
         return {
             "globalRiskScore": 0,
             "successRate": 100,
             "riskTrend": [],
             "topRiskFactors": [],
+            "deploymentHealthIndex": health_data["health_index"],
+            "serviceStabilityScore": health_data["global_stability"],
+            "incidentFrequency": health_data["incident_frequency"],
+            "advancedRiskTrends": []
         }
 
     global_risk_score = sum(d.risk_score for d in deployments) / len(deployments)
 
-    # Calculate success rate as deployments not marked HIGH risk, or just by some logic
-    success_count = sum(1 for d in deployments if d.risk_level != "HIGH")
-    success_rate = (success_count / len(deployments)) * 100
+    # Use existing simplified logic for backwards compatibility of riskTrend and successRate or the new engine?
+    # Engine logic is better for successrate
+    success_rate = health_data["success_rate"]
 
-    # Trend of last 5
+    # Trend of last 5 for backward compatibility
     recent = sorted(deployments, key=lambda d: d.timestamp, reverse=True)[:5]
     risk_trend = [d.risk_score for d in reversed(recent)]
+    
+    # Advanced risk trends
+    advanced_trends = detect_risk_trends(db, window_hours=720)
 
     # Compute risk factors from db fields implicitly
     issues = {
@@ -57,4 +72,10 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         "successRate": round(success_rate, 2),
         "riskTrend": risk_trend,
         "topRiskFactors": top_risk_factors,
+        
+        # Phase 7 new metrics
+        "deploymentHealthIndex": health_data["health_index"],
+        "serviceStabilityScore": health_data["global_stability"],
+        "incidentFrequency": health_data["incident_frequency"],
+        "advancedRiskTrends": advanced_trends
     }

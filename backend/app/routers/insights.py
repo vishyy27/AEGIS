@@ -1,12 +1,9 @@
-from fastapi import APIRouter
-
-# from sqlalchemy.orm import Session
-# from ..database import get_db
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from ..database import get_db
 from ..models.deployment import Deployment
+from ..services.analytics_engine import generate_health_index, get_all_services_stability, detect_risk_trends
 
 router = APIRouter(prefix="/api/insights", tags=["insights"])
 
@@ -49,3 +46,24 @@ def get_insights(db: Session = Depends(get_db)):
         "highest_risk_service": highest_risk_service or "Unknown",
         "most_common_risk_factor": most_common_risk_factor,
     }
+
+@router.get("/deployment-health")
+def get_deployment_health(
+    time_window: int = Query(168, description="Time window in hours"),
+    db: Session = Depends(get_db)
+):
+    return generate_health_index(db, window_hours=time_window)
+
+@router.get("/service-stability")
+def get_service_stability(
+    time_window: int = Query(168, description="Time window in hours"),
+    db: Session = Depends(get_db)
+):
+    return get_all_services_stability(db, window_hours=time_window)
+
+@router.get("/risk-trends")
+def get_risk_trends(
+    time_window: int = Query(720, description="Time window in hours"),
+    db: Session = Depends(get_db)
+):
+    return detect_risk_trends(db, window_hours=time_window)
