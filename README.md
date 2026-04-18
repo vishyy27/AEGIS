@@ -100,45 +100,48 @@ Each recommendation is categorized and prioritized to help engineering teams red
 
 ---
 
-## Deployment Stability Analytics
+## Deployment Stability Analytics (Phase 7)
 
-Phase 7 introduces a **Deployment Stability Analytics Engine** that evaluates historical deployment behavior to determine long-term service reliability and deployment health.
+Phase 7 introduces a **Deployment Stability Analytics Engine** that evaluates long-term deployment behavior to measure system reliability and service health.
 
-Instead of analyzing individual deployments alone, AEGIS now evaluates **deployment stability trends across time windows**, such as:
+Unlike earlier phases that focused on individual deployments, this phase introduces **historical intelligence using database-level aggregations** for scalability and performance.
 
-* Last 24 hours
-* Last 7 days
-* Last 30 days
+### Key Capabilities
 
-The analytics engine computes several reliability metrics:
+* **Deployment Success Rate**
+  Calculates percentage of successful deployments over configurable time windows.
 
-### Deployment Success Rate
+* **Incident Frequency Tracking**
+  Counts incident-triggering deployments using optimized boolean filtering.
 
-Percentage of successful deployments within a defined time window.
+* **Service Stability Score**
+  Computes reliability scores per service using aggregated failures, incidents, and risk signals.
 
-### Incident Frequency
+* **Risk Trend Analysis**
+  Uses SQL-based time aggregation (`AVG`, `GROUP BY`) to analyze how risk evolves over time.
 
-Tracks how often deployments trigger incidents using deployment outcomes and incident flags.
+* **Deployment Health Index**
+  A composite reliability score derived from success rate, incident frequency, and stability metrics.
 
-### Service Stability Score
+---
 
-Evaluates the long-term reliability of services based on historical failures, alerts, and deployment risk patterns.
+## Performance Optimization (Phase 7 Enhancement)
 
-### Risk Trend Analysis
+The analytics engine is designed with **database-first computation strategy**:
 
-Analyzes how deployment risk evolves over time using aggregated historical risk scores.
+* Eliminates `.all()` memory loading
+* Uses SQL aggregation (`func.avg`, `func.count`, `func.sum`)
+* Avoids Python-side loops for large datasets
+* Prevents N+1 query patterns
+* Ensures scalability for large deployment histories
 
-### Deployment Health Index
-
-A composite reliability metric derived from deployment success rates, risk trends, and incident frequency.
-
-These insights help engineering teams **identify unstable services, monitor deployment reliability, and maintain safer release cycles**.
+This allows AEGIS to handle **high-volume deployment analytics efficiently without memory overhead**.
 
 ---
 
 ## Deployment Analytics Dashboard
 
-The platform provides a dashboard that visualizes deployment analytics including:
+The platform provides a dashboard that visualizes:
 
 * Deployment risk trends
 * Incident frequency
@@ -193,36 +196,13 @@ Swagger UI is available for testing and validating backend API endpoints.
 
 Analyzes deployment metadata and returns a deployment risk score along with intelligent recommendations.
 
-### Example Request
-
-```json
-{
-  "repo_name": "example/service",
-  "commit_count": 4,
-  "files_changed": 7,
-  "commit_messages": ["fix authentication bug"],
-  "deployment_environment": "production",
-  "deployment_frequency": 3,
-  "code_churn": 200,
-  "test_coverage": 78,
-  "dependency_updates": 1,
-  "historical_failures": 0
-}
-```
-
 ---
 
 ## CI/CD Webhook Receiver
 
 **POST /api/integrations/webhook**
 
-Receives deployment data directly from CI/CD pipelines and triggers automatic deployment analysis.
-
-Authentication Header:
-
-```
-X-AEGIS-TOKEN: <token>
-```
+Receives deployment data directly from CI/CD pipelines.
 
 ---
 
@@ -232,8 +212,6 @@ X-AEGIS-TOKEN: <token>
 GET /api/deployments
 GET /api/deployments/{deployment_id}
 ```
-
-Retrieve stored deployment analysis results.
 
 ---
 
@@ -245,8 +223,6 @@ GET /api/alerts/{alert_id}
 GET /api/alerts/incidents
 ```
 
-Returns active alerts and aggregated incident patterns detected from deployment history.
-
 ---
 
 ## Dashboard Analytics
@@ -255,7 +231,7 @@ Returns active alerts and aggregated incident patterns detected from deployment 
 GET /api/dashboard/summary
 ```
 
-Provides deployment risk analytics including:
+Returns:
 
 * globalRiskScore
 * riskTrend
@@ -275,7 +251,7 @@ GET /api/insights/service-stability
 GET /api/insights/risk-trends
 ```
 
-Returns long-term deployment reliability metrics derived from historical deployment analytics.
+Provides time-based reliability analytics across deployments.
 
 ---
 
@@ -315,13 +291,13 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Backend runs on:
+Backend:
 
 ```
 http://localhost:8000
 ```
 
-API documentation:
+Docs:
 
 ```
 http://localhost:8000/docs
@@ -337,7 +313,7 @@ npm install
 npm run dev
 ```
 
-Frontend runs on:
+Frontend:
 
 ```
 http://localhost:3000
@@ -346,8 +322,6 @@ http://localhost:3000
 ---
 
 # Development Phases
-
-AEGIS was developed in progressive phases:
 
 * Phase 1 — Infrastructure & API Layer
 * Phase 2 — Deployment Risk Analysis Engine
@@ -361,11 +335,11 @@ AEGIS was developed in progressive phases:
 
 # Future Enhancements
 
-* Machine learning based deployment risk prediction models
+* Machine learning-based deployment risk prediction (Phase 8)
 * Real-time CI/CD pipeline monitoring
-* Cloud provider integrations (AWS, GCP, Azure)
-* Multi-service deployment impact analysis
-* Predictive deployment reliability modeling
+* Advanced anomaly detection in deployments
+* Multi-service dependency risk modeling
+* Cloud-native scalability enhancements
 
 ---
 
