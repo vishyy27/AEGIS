@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case, extract
+from sqlalchemy import func, case, extract, or_
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
@@ -31,45 +31,63 @@ def calculate_success_rate(db: Session, window_hours: int = 24) -> float:
 def compute_service_stability(db: Session, service: Optional[str] = None, window_hours: int = 168) -> float:
     window_start = get_window_start(window_hours)
     
-    base_query = db.query(Deployment).filter(Deployment.timestamp >= window_start)
+    is_failure = or_(
+        Deployment.status.in_(["failure", "error", "rollback"]),
+        Deployment.deployment_outcome.in_(["failure", "error", "rollback"])
+    )
+    
+    stats_query = db.query(
+        func.sum(case((is_failure, 1), else_=0)).label("failures"),
+        func.sum(case((Deployment.risk_score >= 70.0, 1), else_=0)).label("high_risks"),
+        func.sum(case((Deployment.incident_flag == True, 1), else_=0)).label("incidents"),
+        func.count(Deployment.id).label("total")
+    ).filter(Deployment.timestamp >= window_start)
+    
     if service:
-        base_query = base_query.filter(Deployment.repo_name == service)
+        stats_query = stats_query.filter(Deployment.repo_name == service)
         
-    deployments = base_query.all()
-    if not deployments:
+    stats = stats_query.one_or_none()
+    
+    if not stats or not stats.total or stats.total == 0:
         return 100.0
+    
+    failures = stats.failures or 0
+    high_risks = stats.high_risks or 0
+    incidents = stats.incidents or 0
         
-    score = 100.0
-    
-    # -10 per deployment failure
-    failures = sum(1 for d in deployments if d.status in ["failure", "error", "rollback"] or d.deployment_outcome in ["failure", "error", "rollback"])
-    score -= (failures * 10)
-    
-    # -2 per high risk deployment
-    high_risks = sum(1 for d in deployments if d.risk_score is not None and d.risk_score >= 70.0)
-    score -= (high_risks * 2)
-    
-    # -5 per incident flag (critical failure indicator)
-    incidents = sum(1 for d in deployments if d.incident_flag)
-    score -= (incidents * 5)
+    score = 100.0 - (failures * 10) - (high_risks * 2) - (incidents * 5)
         
     return max(0.0, round(score, 2))
 
 
 def get_all_services_stability(db: Session, window_hours: int = 168) -> List[Dict[str, Any]]:
-    # Get all distinct services in the window
     window_start = get_window_start(window_hours)
-    services = db.query(Deployment.repo_name).filter(
+    
+    is_failure = or_(
+        Deployment.status.in_(["failure", "error", "rollback"]),
+        Deployment.deployment_outcome.in_(["failure", "error", "rollback"])
+    )
+    
+    stats_query = db.query(
+        Deployment.repo_name,
+        func.sum(case((is_failure, 1), else_=0)).label("failures"),
+        func.sum(case((Deployment.risk_score >= 70.0, 1), else_=0)).label("high_risks"),
+        func.sum(case((Deployment.incident_flag == True, 1), else_=0)).label("incidents")
+    ).filter(
         Deployment.timestamp >= window_start,
         Deployment.repo_name.isnot(None)
-    ).distinct().all()
+    ).group_by(Deployment.repo_name).all()
     
     results = []
-    for (svc,) in services:
-        stability = compute_service_stability(db, service=svc, window_hours=window_hours)
+    for row in stats_query:
+        failures = row.failures or 0
+        high_risks = row.high_risks or 0
+        incidents = row.incidents or 0
+        score = 100.0 - (failures * 10) - (high_risks * 2) - (incidents * 5)
+        
         results.append({
-            "service": svc,
-            "stability_index": stability
+            "service": row.repo_name,
+            "stability_index": max(0.0, round(score, 2))
         })
         
     # Sort by stability ascending (worst first)
