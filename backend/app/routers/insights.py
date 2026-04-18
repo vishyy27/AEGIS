@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case
 from ..database import get_db
 from ..models.deployment import Deployment
 from ..services.analytics_engine import generate_health_index, get_all_services_stability, detect_risk_trends
@@ -10,31 +10,32 @@ router = APIRouter(prefix="/api/insights", tags=["insights"])
 
 @router.get("/")
 def get_insights(db: Session = Depends(get_db)):
-    deployments = db.query(Deployment).all()
-    if not deployments:
+    stats = db.query(
+        func.avg(Deployment.risk_score).label("average_risk"),
+        func.sum(case((Deployment.code_churn > 500, 1), else_=0)).label("high_code_churn"),
+        func.sum(case((Deployment.test_coverage < 70, 1), else_=0)).label("low_test_coverage"),
+        func.sum(case((Deployment.historical_failures > 3, 1), else_=0)).label("frequent_failures"),
+        func.count(Deployment.id).label("total")
+    ).one_or_none()
+
+    if not stats or not stats.total or stats.total == 0:
         return {
             "average_risk": 0,
             "highest_risk_service": "None",
             "most_common_risk_factor": "None",
         }
 
-    average_risk = sum(d.risk_score for d in deployments) / len(deployments)
-    highest_risk_service = max(deployments, key=lambda d: d.risk_score).repo_name
+    average_risk = stats.average_risk or 0
 
-    # Compute most common risk factor implicitly since not direct string array in DB
+    highest_risk_service_row = db.query(Deployment.repo_name).order_by(Deployment.risk_score.desc()).first()
+    highest_risk_service = highest_risk_service_row[0] if highest_risk_service_row else "Unknown"
+
     issues = {
-        "High code churn": sum(
-            1 for d in deployments if d.code_churn and d.code_churn > 500
-        ),
-        "Low test coverage": sum(
-            1 for d in deployments if d.test_coverage and d.test_coverage < 70
-        ),
-        "Frequent historical failures": sum(
-            1
-            for d in deployments
-            if d.historical_failures and d.historical_failures > 3
-        ),
+        "High code churn": stats.high_code_churn or 0,
+        "Low test coverage": stats.low_test_coverage or 0,
+        "Frequent historical failures": stats.frequent_failures or 0,
     }
+    
     most_common_risk_factor = (
         max(issues.items(), key=lambda x: x[1])[0]
         if max(issues.values()) > 0
@@ -43,7 +44,7 @@ def get_insights(db: Session = Depends(get_db)):
 
     return {
         "average_risk": round(average_risk, 2),
-        "highest_risk_service": highest_risk_service or "Unknown",
+        "highest_risk_service": highest_risk_service,
         "most_common_risk_factor": most_common_risk_factor,
     }
 

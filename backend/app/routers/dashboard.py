@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import func, case
 from ..database import get_db
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -11,17 +12,19 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
     from ..models.deployment import Deployment
     from ..services.analytics_engine import generate_health_index, get_all_services_stability, detect_risk_trends
 
-    # Query metrics
-    deployments = db.query(Deployment).all()
-    
-    # Get advanced analytics from Phase 7 engine
     health_data = generate_health_index(db, window_hours=720) # 30 days
     stability_data = get_all_services_stability(db, window_hours=720)
+    advanced_trends = detect_risk_trends(db, window_hours=720)
     
-    # Use 30-day trends for the riskTrend metric as well if possible, or fallback to the previous 5 recent logic depending on what frontend expects. 
-    # The new trends return objects with `date` and `average_risk`. Let's still provide riskTrend as numbers for backward compatibility.
+    stats = db.query(
+        func.avg(Deployment.risk_score).label("global_risk_score"),
+        func.sum(case((Deployment.code_churn > 500, 1), else_=0)).label("high_code_churn"),
+        func.sum(case((Deployment.test_coverage < 70, 1), else_=0)).label("low_test_coverage"),
+        func.sum(case((Deployment.historical_failures > 3, 1), else_=0)).label("frequent_failures"),
+        func.count(Deployment.id).label("total")
+    ).one_or_none()
     
-    if not deployments:
+    if not stats or not stats.total or stats.total == 0:
         return {
             "globalRiskScore": 0,
             "successRate": 100,
@@ -30,35 +33,22 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
             "deploymentHealthIndex": health_data["health_index"],
             "serviceStabilityScore": health_data["global_stability"],
             "incidentFrequency": health_data["incident_frequency"],
-            "advancedRiskTrends": []
+            "advancedRiskTrends": advanced_trends
         }
 
-    global_risk_score = sum(d.risk_score for d in deployments) / len(deployments)
+    global_risk_score = stats.global_risk_score or 0
 
-    # Use existing simplified logic for backwards compatibility of riskTrend and successRate or the new engine?
-    # Engine logic is better for successrate
     success_rate = health_data["success_rate"]
 
     # Trend of last 5 for backward compatibility
-    recent = sorted(deployments, key=lambda d: d.timestamp, reverse=True)[:5]
-    risk_trend = [d.risk_score for d in reversed(recent)]
-    
-    # Advanced risk trends
-    advanced_trends = detect_risk_trends(db, window_hours=720)
+    recent = db.query(Deployment.risk_score).order_by(Deployment.timestamp.desc()).limit(5).all()
+    risk_trend = [r[0] for r in reversed(recent) if r[0] is not None]
 
-    # Compute risk factors from db fields implicitly
+    # Compute risk factors from db fields
     issues = {
-        "High Code Churn": sum(
-            1 for d in deployments if d.code_churn and d.code_churn > 500
-        ),
-        "Low Test Coverage": sum(
-            1 for d in deployments if d.test_coverage and d.test_coverage < 70
-        ),
-        "Frequent Failures": sum(
-            1
-            for d in deployments
-            if d.historical_failures and d.historical_failures > 3
-        ),
+        "High Code Churn": stats.high_code_churn or 0,
+        "Low Test Coverage": stats.low_test_coverage or 0,
+        "Frequent Failures": stats.frequent_failures or 0,
     }
 
     # Get top 2 factors with their counts formatted as impact
