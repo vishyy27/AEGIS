@@ -205,9 +205,20 @@ def get_ml_performance_metrics(db: Session, limit: int = 50) -> Dict[str, Any]:
         if d.predicted_failure:
             predicted_failures += 1
                 
-    accuracy = (correct_predictions / len(recent)) * 100.0
-    precision = (true_positive_failures / predicted_failures * 100.0) if predicted_failures > 0 else 0.0
-    recall = (true_positive_failures / (true_positive_failures + false_negative_failures) * 100.0) if (true_positive_failures + false_negative_failures) > 0 else 0.0
+    try:
+        accuracy = (correct_predictions / len(recent)) * 100.0
+    except ZeroDivisionError:
+        accuracy = 0.0
+        
+    try:
+        precision = (true_positive_failures / predicted_failures) * 100.0
+    except ZeroDivisionError:
+        precision = 0.0
+        
+    try:
+        recall = (true_positive_failures / (true_positive_failures + false_negative_failures)) * 100.0
+    except ZeroDivisionError:
+        recall = 0.0
     
     return {
         "status": "ready",
