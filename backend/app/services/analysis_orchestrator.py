@@ -7,6 +7,7 @@ from .risk_engine import calculate_risk_score
 from .recommendation_engine import build_recommendation_context, generate_context_recommendations
 from .alert_service import run_alert_intelligence_pipeline, analyze_deployment_history
 from .change_intelligence import analyze_code_changes
+from .ml_engine import ml_engine
 
 def evaluate_deployment(request: AnalysisRequest, db: Session) -> AnalysisResponse:
     # Phase 3: Pre-processing Intelligence
@@ -17,17 +18,24 @@ def evaluate_deployment(request: AnalysisRequest, db: Session) -> AnalysisRespon
         request.dict()
     )
 
-    # Aggregation
-    final_risk_score = round(
-        min(0.7 * deploy_risk_score + 0.3 * intelligence["change_risk_score"], 100.0), 2
-    )
-
-    if final_risk_score >= 70.0:
-        final_risk_level = "HIGH"
-    elif final_risk_score >= 40.0:
-        final_risk_level = "MEDIUM"
-    else:
-        final_risk_level = "LOW"
+    # ML Phase 8 Override
+    ml_used = False
+    ml_prediction_prob = None
+    try:
+        ml_risk_score, ml_risk_level, ml_prediction_prob = ml_engine.predict_risk(intelligence, request.dict())
+        final_risk_score = ml_risk_score
+        final_risk_level = ml_risk_level
+        ml_used = True
+    except Exception as e:
+        final_risk_score = round(
+            min(0.7 * deploy_risk_score + 0.3 * intelligence["change_risk_score"], 100.0), 2
+        )
+        if final_risk_score >= 70.0:
+            final_risk_level = "HIGH"
+        elif final_risk_score >= 40.0:
+            final_risk_level = "MEDIUM"
+        else:
+            final_risk_level = "LOW"
 
     combined_risk_factors = deploy_risk_factors + intelligence["risk_categories"]
 
@@ -52,6 +60,8 @@ def evaluate_deployment(request: AnalysisRequest, db: Session) -> AnalysisRespon
         branch_name=request.branch_name,
         commit_hash=request.commit_hash,
         deployment_environment=request.deployment_environment,
+        ml_prediction_prob=ml_prediction_prob,
+        ml_used=ml_used
     )
     db.add(deployment)
     db.commit()
