@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # CI/CD webhook security token
     AEGIS_SECRET_TOKEN: str = "dev-token-123"
 
+    # Phase 9 Policy Engine Thresholds
+    RISK_ALLOW_THRESHOLD: int = 40
+    RISK_BLOCK_THRESHOLD: int = 70
+
     class Config:
         case_sensitive = True
         env_file = ".env"
