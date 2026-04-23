@@ -8,7 +8,7 @@ from .risk_engine import calculate_risk_score
 from .recommendation_engine import build_recommendation_context, generate_context_recommendations
 from .alert_service import run_alert_intelligence_pipeline, analyze_deployment_history
 from .change_intelligence import analyze_code_changes
-from .analytics_engine import get_rolling_failure_rate, get_rolling_avg_risk
+from .analytics_engine import get_rolling_failure_rate, get_rolling_avg_risk, detect_feature_drift
 from .ml_engine import ml_engine
 
 def evaluate_deployment(request: AnalysisRequest, db: Session, background_tasks: BackgroundTasks) -> AnalysisResponse:
@@ -59,7 +59,11 @@ def evaluate_deployment(request: AnalysisRequest, db: Session, background_tasks:
     deployment.prediction_confidence_score = None
     
     try:
-        ml_risk_score, ml_risk_level, ml_prediction_prob = ml_engine.predict_risk(deployment)
+        drift_data = detect_feature_drift(db, deployment)
+        deployment.drift_detected = drift_data["drift_detected"]
+        deployment.drift_score = drift_data["drift_score"]
+        
+        ml_risk_score, ml_risk_level, ml_prediction_prob, top_factors = ml_engine.predict_risk(deployment)
         deployment.ml_prediction_prob = ml_prediction_prob
         deployment.ml_used = True
         deployment.model_version = ml_engine.current_version
@@ -83,6 +87,8 @@ def evaluate_deployment(request: AnalysisRequest, db: Session, background_tasks:
             deployment.risk_score = ml_risk_score
             deployment.risk_level = ml_risk_level
             
+        combined_risk_factors = deploy_risk_factors + intelligence["risk_categories"] + top_factors
+            
     except Exception as e:
         print(f"ML Prediction failed/missing: {e}. Defaulting to rule engine.")
         # Fallback 100% to rules
@@ -96,8 +102,8 @@ def evaluate_deployment(request: AnalysisRequest, db: Session, background_tasks:
         else:
             deployment.risk_level = "LOW"
 
-    combined_risk_factors = deploy_risk_factors + intelligence["risk_categories"]
-
+    if deployment.drift_detected:
+        combined_risk_factors.append(f"Feature Drift Detected (Score: {deployment.drift_score:.2f}) - Model Retraining Advised")
     # Persist the deployment
     db.add(deployment)
     db.commit()
@@ -155,3 +161,27 @@ def evaluate_deployment(request: AnalysisRequest, db: Session, background_tasks:
         recommendations=legacy_recs,
         context_recommendations=context_recs_out
     )
+
+
+def register_deployment_outcome(db: Session, deployment_id: int, outcome: str) -> bool:
+    """
+    Phase 8.3 Feedback Loop Entrypoint.
+    Called when the CI/CD pipeline definitively reports Success or Failure.
+    """
+    deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
+    if not deployment:
+        return False
+        
+    deployment.deployment_outcome = outcome
+    
+    # Process feedback loop telemetry
+    actual_failure = outcome.lower() in ["failure", "error", "rollback", "failed"]
+    deployment.actual_outcome = actual_failure
+    
+    if deployment.ml_used and deployment.ml_prediction_prob is not None:
+        predicted_failure = deployment.ml_prediction_prob >= 0.5
+        deployment.predicted_failure = predicted_failure
+        deployment.prediction_correct = (predicted_failure == actual_failure)
+        
+    db.commit()
+    return True

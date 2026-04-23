@@ -57,6 +57,14 @@ class Deployment(Base):
     model_version = Column(String, nullable=True)
     prediction_confidence_score = Column(Float, nullable=True)
     
+    # Phase 8.3 Machine Learning Intelligence & XAI
+    prediction_correct = Column(Boolean, nullable=True)
+    predicted_failure = Column(Boolean, nullable=True)
+    actual_outcome = Column(Boolean, nullable=True)
+    feature_signature = Column(String, nullable=True)
+    drift_detected = Column(Boolean, default=False)
+    drift_score = Column(Float, nullable=True)
+    
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
