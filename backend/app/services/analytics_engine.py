@@ -179,7 +179,7 @@ def get_ml_performance_metrics(db: Session, limit: int = 50) -> Dict[str, Any]:
     recent = db.query(Deployment).filter(
         Deployment.ml_used == True,
         Deployment.deployment_outcome.isnot(None),
-        Deployment.ml_prediction_prob.isnot(None)
+        Deployment.prediction_correct.isnot(None)
     ).order_by(Deployment.timestamp.desc()).limit(limit).all()
     
     if not recent:
@@ -189,28 +189,68 @@ def get_ml_performance_metrics(db: Session, limit: int = 50) -> Dict[str, Any]:
     true_failures = 0
     predicted_failures = 0
     true_positive_failures = 0
+    false_negative_failures = 0
     
     for d in recent:
-        actual_failure = d.deployment_outcome in ["failure", "error", "rollback", "failed"]
-        predicted_failure = d.ml_prediction_prob >= 0.5
-        
-        if actual_failure == predicted_failure:
+        if d.prediction_correct:
             correct_predictions += 1
             
-        if actual_failure:
+        if d.actual_outcome:  # True if it actually failed
             true_failures += 1
-        if predicted_failure:
-            predicted_failures += 1
-            if actual_failure:
+            if d.predicted_failure:
                 true_positive_failures += 1
+            else:
+                false_negative_failures += 1
+                
+        if d.predicted_failure:
+            predicted_failures += 1
                 
     accuracy = (correct_predictions / len(recent)) * 100.0
     precision = (true_positive_failures / predicted_failures * 100.0) if predicted_failures > 0 else 0.0
+    recall = (true_positive_failures / (true_positive_failures + false_negative_failures) * 100.0) if (true_positive_failures + false_negative_failures) > 0 else 0.0
     
     return {
         "status": "ready",
         "samples": len(recent),
         "rolling_accuracy": round(accuracy, 2),
         "failure_prediction_precision": round(precision, 2),
+        "failure_detection_recall": round(recall, 2),
         "model_versions_in_window": list(set(d.model_version for d in recent if d.model_version))
+    }
+
+
+def detect_feature_drift(db: Session, current: Deployment) -> Dict[str, Any]:
+    """
+    Phase 8.3: Detect concept/feature drift by comparing the current
+    deployment's metrics to the 30-deployment rolling historical average.
+    """
+    recent = db.query(Deployment).filter(
+        Deployment.repo_name == current.repo_name,
+        Deployment.commit_count.isnot(None),
+        Deployment.files_changed.isnot(None)
+    ).order_by(Deployment.timestamp.desc()).limit(30).all()
+    
+    if len(recent) < 10:
+        return {"drift_detected": False, "drift_score": 0.0}
+        
+    avg_commit_count = sum((d.commit_count or 0) for d in recent) / len(recent)
+    avg_churn = sum((d.code_churn or 0) for d in recent) / len(recent)
+    
+    curr_commit = float(current.commit_count or 0)
+    curr_churn = float(current.code_churn or 0)
+    
+    # Calculate simple magnitude drift on core unstable features
+    drift_score = 0.0
+    if avg_commit_count > 0:
+        drift_score += abs(curr_commit - avg_commit_count) / avg_commit_count
+    if avg_churn > 0:
+        drift_score += abs(curr_churn - avg_churn) / avg_churn
+        
+    # Standardize drift bounds
+    drift_score = min(drift_score, 10.0) 
+    drift_detected = drift_score > 3.0  # Over 300% deviation triggers drift warning
+    
+    return {
+        "drift_detected": drift_detected,
+        "drift_score": round(drift_score, 2)
     }
