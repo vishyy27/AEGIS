@@ -1,6 +1,7 @@
 import hashlib
 import hmac
-from fastapi import APIRouter, Depends, Request, HTTPException, Header
+from datetime import datetime
+from fastapi import APIRouter, Depends, Request, HTTPException, Header, BackgroundTasks
 from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 
@@ -8,6 +9,9 @@ from ..database import get_db
 from ..config import settings
 from ..services.cicd_integrations import detect_cicd_platform, normalize_pipeline_payload
 from ..services.analysis_orchestrator import evaluate_deployment
+from ..services.policy_engine import evaluate_from_analysis
+from ..schemas.integration_schema import PolicyDecisionResponse
+from ..models.deployment import Deployment
 
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 
@@ -51,14 +55,16 @@ async def verify_security(request: Request, api_key: str):
     return platform
 
 
-@router.post("/webhook")
+@router.post("/webhook", response_model=PolicyDecisionResponse)
 async def webhook_receiver(
     request: Request,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     x_aegis_token: str = Header(..., alias="X-AEGIS-TOKEN")
 ):
     """
     Webhook ingestion endpoint for CI/CD integrations.
+    Returns policy decision after full analysis pipeline.
     """
 
     # Authenticate request
@@ -96,9 +102,32 @@ async def webhook_receiver(
         )
 
     # Trigger analysis pipeline
-    evaluate_deployment(analysis_request, db)
+    analysis_response = evaluate_deployment(analysis_request, db, background_tasks)
 
-    return {
-        "status": "success",
-        "message": f"{platform} webhook processed and analysis triggered."
-    }
+    # Evaluate policy decision
+    policy_decision = evaluate_from_analysis(
+        risk_score=analysis_response.risk_score,
+        risk_level=analysis_response.risk_level,
+        risk_factors=analysis_response.risk_factors,
+        alert_severity=None,
+        affected_modules=analysis_request.changed_files,
+        historical_failures=analysis_request.historical_failures
+    )
+
+    # Persist decision to deployment
+    deployment = db.query(Deployment).filter(Deployment.id == analysis_response.deployment_id).first()
+    if deployment:
+        deployment.deployment_decision = policy_decision.decision
+        deployment.decision_timestamp = datetime.utcnow()
+        db.commit()
+
+    return PolicyDecisionResponse(
+        decision=policy_decision.decision,
+        risk_score=policy_decision.risk_score,
+        risk_level=policy_decision.risk_level,
+        recommendations=policy_decision.recommendations,
+        message=policy_decision.message,
+        override_reason=policy_decision.override_reason,
+        alert_severity=policy_decision.alert_severity,
+        affected_modules=policy_decision.affected_modules
+    )

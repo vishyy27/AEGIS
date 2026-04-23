@@ -66,6 +66,10 @@ class Deployment(Base):
     drift_score = Column(Float, nullable=True)
     low_confidence_flag = Column(Boolean, default=False)
     
+    # Phase 9 Policy Engine (optional, backward-safe)
+    deployment_decision = Column(String, nullable=True)
+    decision_timestamp = Column(DateTime, nullable=True)
+    
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
