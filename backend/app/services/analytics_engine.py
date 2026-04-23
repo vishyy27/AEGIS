@@ -147,3 +147,70 @@ def generate_health_index(db: Session, window_hours: int = 168) -> Dict[str, Any
         "incident_frequency": incident_count,
         "time_window_hours": window_hours
     }
+
+
+def get_rolling_failure_rate(db: Session, repo_name: str, limit: int = 10) -> float:
+    recent = db.query(Deployment).filter(
+        Deployment.repo_name == repo_name,
+        Deployment.deployment_outcome.isnot(None)
+    ).order_by(Deployment.timestamp.desc()).limit(limit).all()
+    
+    if not recent:
+        return 0.0
+        
+    failures = sum(1 for d in recent if d.deployment_outcome in ["failure", "error", "rollback", "failed"])
+    return round((failures / len(recent)) * 100.0, 2)
+
+
+def get_rolling_avg_risk(db: Session, repo_name: str, limit: int = 5) -> float:
+    recent = db.query(Deployment.risk_score).filter(
+        Deployment.repo_name == repo_name,
+        Deployment.risk_score.isnot(None)
+    ).order_by(Deployment.timestamp.desc()).limit(limit).all()
+    
+    if not recent:
+        return 0.0
+        
+    total = sum(r[0] for r in recent)
+    return round(total / len(recent), 2)
+
+
+def get_ml_performance_metrics(db: Session, limit: int = 50) -> Dict[str, Any]:
+    recent = db.query(Deployment).filter(
+        Deployment.ml_used == True,
+        Deployment.deployment_outcome.isnot(None),
+        Deployment.ml_prediction_prob.isnot(None)
+    ).order_by(Deployment.timestamp.desc()).limit(limit).all()
+    
+    if not recent:
+        return {"status": "insufficient_data", "samples": 0}
+        
+    correct_predictions = 0
+    true_failures = 0
+    predicted_failures = 0
+    true_positive_failures = 0
+    
+    for d in recent:
+        actual_failure = d.deployment_outcome in ["failure", "error", "rollback", "failed"]
+        predicted_failure = d.ml_prediction_prob >= 0.5
+        
+        if actual_failure == predicted_failure:
+            correct_predictions += 1
+            
+        if actual_failure:
+            true_failures += 1
+        if predicted_failure:
+            predicted_failures += 1
+            if actual_failure:
+                true_positive_failures += 1
+                
+    accuracy = (correct_predictions / len(recent)) * 100.0
+    precision = (true_positive_failures / predicted_failures * 100.0) if predicted_failures > 0 else 0.0
+    
+    return {
+        "status": "ready",
+        "samples": len(recent),
+        "rolling_accuracy": round(accuracy, 2),
+        "failure_prediction_precision": round(precision, 2),
+        "model_versions_in_window": list(set(d.model_version for d in recent if d.model_version))
+    }
