@@ -43,6 +43,10 @@ class Deployment(Base):
     deployment_outcome = Column(String, nullable=True)
     incident_flag = Column(Boolean, default=False)
     
+    # Phase 8 Machine Learning Columns
+    ml_prediction_prob = Column(Float, nullable=True)
+    ml_used = Column(Boolean, default=False)
+    
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
