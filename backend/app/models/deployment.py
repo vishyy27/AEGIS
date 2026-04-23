@@ -47,6 +47,16 @@ class Deployment(Base):
     ml_prediction_prob = Column(Float, nullable=True)
     ml_used = Column(Boolean, default=False)
     
+    # Phase 8.2 Production ML Extensions
+    failure_rate_last_10 = Column(Float, nullable=True)
+    avg_risk_last_5 = Column(Float, nullable=True)
+    has_db_migration = Column(Boolean, nullable=True, default=False)
+    has_auth_changes = Column(Boolean, nullable=True, default=False)
+    has_payment_changes = Column(Boolean, nullable=True, default=False)
+    has_core_module_changes = Column(Boolean, nullable=True, default=False)
+    model_version = Column(String, nullable=True)
+    prediction_confidence_score = Column(Float, nullable=True)
+    
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
