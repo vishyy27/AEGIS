@@ -64,6 +64,7 @@ class Deployment(Base):
     feature_signature = Column(String, nullable=True)
     drift_detected = Column(Boolean, default=False)
     drift_score = Column(Float, nullable=True)
+    low_confidence_flag = Column(Boolean, default=False)
     
     timestamp = Column(DateTime, default=datetime.utcnow)
 

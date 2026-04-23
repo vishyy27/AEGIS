@@ -1,6 +1,8 @@
 import json
 from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session
+import logging
+
 from ..models.deployment import Deployment
 from ..models.alerts import Alert
 from ..schemas.analysis_schema import AnalysisRequest, AnalysisResponse
@@ -10,6 +12,8 @@ from .alert_service import run_alert_intelligence_pipeline, analyze_deployment_h
 from .change_intelligence import analyze_code_changes
 from .analytics_engine import get_rolling_failure_rate, get_rolling_avg_risk, detect_feature_drift
 from .ml_engine import ml_engine
+
+logger = logging.getLogger("aegis.ml")
 
 def evaluate_deployment(request: AnalysisRequest, db: Session, background_tasks: BackgroundTasks) -> AnalysisResponse:
     # Phase 3: Pre-processing Intelligence
@@ -63,6 +67,10 @@ def evaluate_deployment(request: AnalysisRequest, db: Session, background_tasks:
         deployment.drift_detected = drift_data["drift_detected"]
         deployment.drift_score = drift_data["drift_score"]
         
+        if deployment.drift_detected:
+            logger.warning(f"[ML] drift_triggered=True score={deployment.drift_score} action=background_retrain")
+            background_tasks.add_task(ml_engine.train_model, db)
+        
         ml_risk_score, ml_risk_level, ml_prediction_prob, top_factors = ml_engine.predict_risk(deployment)
         deployment.ml_prediction_prob = ml_prediction_prob
         deployment.ml_used = True
@@ -70,8 +78,10 @@ def evaluate_deployment(request: AnalysisRequest, db: Session, background_tasks:
         
         confidence = abs(0.5 - ml_prediction_prob) * 2.0
         deployment.prediction_confidence_score = confidence
+        deployment.low_confidence_flag = (confidence < 0.30)
         
-        if confidence < 0.30:
+        if deployment.low_confidence_flag:
+            logger.info(f"[ML] confidence_triggered=True action=hybrid_fallback confidence={confidence:.2f}")
             # High uncertainty! Blend gracefully. High code churn/anomaly but strange signals.
             blended_score = (0.7 * ml_risk_score) + (0.3 * deploy_risk_score)
             deployment.risk_score = round(blended_score, 2)
@@ -165,12 +175,17 @@ def evaluate_deployment(request: AnalysisRequest, db: Session, background_tasks:
 
 def register_deployment_outcome(db: Session, deployment_id: int, outcome: str) -> bool:
     """
-    Phase 8.3 Feedback Loop Entrypoint.
+    Phase 8.3/8.4 Feedback Loop Entrypoint.
     Called when the CI/CD pipeline definitively reports Success or Failure.
     """
     deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
     if not deployment:
+        logger.warning(f"[ML] feedback_rejected=True reason=missing_deployment id={deployment_id}")
         return False
+        
+    if deployment.prediction_correct is not None:
+        logger.info(f"[ML] feedback_idempotent=True id={deployment_id}")
+        return True
         
     deployment.deployment_outcome = outcome
     
@@ -182,6 +197,7 @@ def register_deployment_outcome(db: Session, deployment_id: int, outcome: str) -
         predicted_failure = deployment.ml_prediction_prob >= 0.5
         deployment.predicted_failure = predicted_failure
         deployment.prediction_correct = (predicted_failure == actual_failure)
+        logger.info(f"[ML] feedback_processed=True id={deployment_id} correct={deployment.prediction_correct}")
         
     db.commit()
     return True
