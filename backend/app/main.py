@@ -60,6 +60,7 @@ from .routers import (
     insights_router,
 )
 from .routers.incidents import router as incidents_router
+from .routers.ml import router as ml_router
 
 app.include_router(dashboard_router)
 app.include_router(deployments_router)
@@ -70,3 +71,4 @@ app.include_router(settings_router)
 app.include_router(environments_router)
 app.include_router(insights_router)
 app.include_router(incidents_router)
+app.include_router(ml_router)
