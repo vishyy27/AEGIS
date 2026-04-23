@@ -4,6 +4,7 @@ import glob
 import json
 import hashlib
 import threading
+import logging
 from datetime import datetime
 from typing import Dict, Any, Tuple, Optional, List
 from sqlalchemy.orm import Session
@@ -23,6 +24,13 @@ FEATURE_NAMES = [
     "avg_risk_last_5", "has_db_migration", "has_auth_changes", 
     "has_payment_changes", "has_core_module_changes"
 ]
+
+logger = logging.getLogger("aegis.ml")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    ch.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    logger.addHandler(ch)
 
 class MLEngine:
     def __init__(self):
@@ -52,12 +60,14 @@ class MLEngine:
             if os.path.exists(meta_filepath):
                 with open(meta_filepath, "r") as f:
                     self.current_metadata = json.load(f)
+                logger.info(f"[ML] version={self.current_version} meta_loaded=True samples={self.current_metadata.get('samples_trained')} created={self.current_metadata.get('created_at')}")
             else:
                 self.current_metadata = {}
+                logger.warning(f"[ML] version={self.current_version} meta_loaded=False")
                 
             return True
         except Exception as e:
-            print(f"Error loading ML model {latest_model}: {e}")
+            logger.error(f"[ML] load_failed={latest_model} error={str(e)}")
             self.model = None
             self.current_version = None
             self.current_metadata = {}
@@ -118,14 +128,17 @@ class MLEngine:
     def train_model(self, db: Session) -> Dict[str, Any]:
         """Trains ML model using locked concurrency guards."""
         if not self._train_lock.acquire(blocking=False):
+            logger.warning("[ML] train_bypassed=True reason=locked")
             return {"status": "error", "message": "Model is already actively training."}
             
         try:
+            logger.info("[ML] train_start=True")
             past_deployments = db.query(Deployment).filter(
                 Deployment.deployment_outcome.isnot(None)
             ).all()
             
             if len(past_deployments) < 30: # Upgraded to 30 for safety
+                logger.warning(f"[ML] train_bypassed=True reason=insufficient_data samples={len(past_deployments)}")
                 return {"status": "error", "message": f"Insufficient data to train model. Need 30 records, have {len(past_deployments)}."}
                 
             X = []
@@ -144,6 +157,7 @@ class MLEngine:
                 y.append(label)
                 
             if len(set(y)) < 2:
+                logger.warning("[ML] train_bypassed=True reason=uniform_data_set")
                 return {"status": "error", "message": "Insufficient variance in training labels. Both success and failure records are required."}
                 
             pipeline = Pipeline([
@@ -175,6 +189,7 @@ class MLEngine:
             with open(meta_path, "w") as f:
                 json.dump(self.current_metadata, f, indent=4)
                 
+            logger.info(f"[ML] train_complete=True version={self.current_version} samples={len(y)}")
             return {
                 "status": "success",
                 "message": "Model trained successfully.",
@@ -193,11 +208,14 @@ class MLEngine:
         scaler = self.model.named_steps['scaler']
         classifier = self.model.named_steps['classifier']
         
-        # We need the coefficients corresponding to the failure class (index 1 usually)
-        if classifier.classes_[1] == 1:
-            coefs = classifier.coef_[0]
-        else:
-            coefs = -classifier.coef_[0]
+        try:
+            # We need the coefficients corresponding to the failure class (index 1 usually)
+            if classifier.classes_[1] == 1:
+                coefs = classifier.coef_[0]
+            else:
+                coefs = -classifier.coef_[0]
+        except Exception:
+            return []
             
         scaled_features = scaler.transform([features])[0]
         
@@ -213,7 +231,8 @@ class MLEngine:
         top_factors = []
         for fname, impact in contributions[:2]:
             display_name = fname.replace("_", " ").title()
-            top_factors.append(f"ML identified {display_name} as a major failure indicator (+{impact:.2f})")
+            # Normalize impact float to look clean (limit to 1 decimal normally)
+            top_factors.append(f"ML identified {display_name} as a major failure indicator (+{impact:.1f})")
             
         return top_factors
 
@@ -245,6 +264,8 @@ class MLEngine:
             
         # Get XAI explanations
         top_factors = self._explain_prediction(features, probabilities)
+        
+        logger.info(f"[ML] prediction_cycle=Complete version={self.current_version} score={ml_risk_score} drift=0 confidence={float(abs(0.5 - failure_prob) * 2.0):.2f}")
             
         return ml_risk_score, ml_risk_level, failure_prob, top_factors
 
