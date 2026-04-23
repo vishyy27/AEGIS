@@ -62,7 +62,10 @@ req = AnalysisRequest(
 )
 
 async def test_analysis():
-    response = await analyze_deployment(req, db)
+    # Pass a BackgroundTasks mock or stub
+    from fastapi import BackgroundTasks
+    bg = BackgroundTasks()
+    response = await analyze_deployment(req, bg, db)
     print("Analysis Response output:")
     print("Deployment ID:", response.deployment_id)
     print("Risk Score (should be high):", response.risk_score)
@@ -74,6 +77,14 @@ async def test_analysis():
     print("\nDatabase Tracking:")
     print("ML Used:", dep.ml_used)
     print("ML Prediction Prob:", dep.ml_prediction_prob)
+    print("Model Version:", dep.model_version)
+    print("Confidence Score:", dep.prediction_confidence_score)
+    print("Failure Rate last 10:", dep.failure_rate_last_10)
+
+    print("\n--- 4. Testing Telemetry /api/ml/metrics ---")
+    from app.routers.ml import get_metrics
+    metrics = get_metrics(50, db)
+    print("Model Performance Metrics:", metrics)
 
 asyncio.run(test_analysis())
 
