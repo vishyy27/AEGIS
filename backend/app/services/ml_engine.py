@@ -327,68 +327,126 @@ def analyze_prediction_error(db: Session, limit: int = 50) -> dict:
     }
 
 
-def get_adaptive_thresholds(db: Session, limit: int = 50) -> dict:
+def get_adaptive_thresholds(db: Session, limit: int = 50, decay_factor: float = 0.05) -> dict:
     """
-    Phase 9.2: Derive dynamic risk block/allow thresholds based on rolling precision/recall.
-    Returns adjusted thresholds and a human-readable explanation list.
+    Phase 9.3: Derive dynamic risk block/allow thresholds based on decay-weighted
+    rolling precision/recall. Returns adjusted thresholds, explanation list, and
+    a threshold_version fingerprint for audit tracing.
+
+    `decay_factor` controls recency weighting (λ in e^(-λ × age_days)).
     """
+    import math
+    import json
+    import hashlib
+    from datetime import datetime
     from ..config import settings
-    base_block = settings.RISK_BLOCK_THRESHOLD
-    base_allow = settings.RISK_ALLOW_THRESHOLD
+    from ..models.deployment import Deployment as DeploymentModel
+
+    base_block    = settings.RISK_BLOCK_THRESHOLD
+    base_allow    = settings.RISK_ALLOW_THRESHOLD
     base_ml_block = 0.80
 
-    metrics = analyze_prediction_error(db, limit=limit)
-    reasons = []
+    # --- Decay-weighted precision/recall ---
+    evaluated = (
+        db.query(DeploymentModel)
+        .filter(
+            DeploymentModel.prediction_correct.isnot(None),
+            DeploymentModel.actual_outcome.isnot(None),
+            DeploymentModel.predicted_failure.isnot(None),
+        )
+        .order_by(DeploymentModel.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
 
-    if metrics["insufficient_data"]:
+    if not evaluated:
+        threshold_state = {
+            "block": base_block, "allow": base_allow,
+            "ml": base_ml_block, "active": False,
+        }
+        tv = hashlib.sha256(json.dumps(threshold_state, sort_keys=True).encode()).hexdigest()[:16]
         return {
             "risk_block_threshold": base_block,
             "risk_allow_threshold": base_allow,
             "ml_block_probability": base_ml_block,
             "adaptation_active": False,
+            "threshold_version": tv,
             "reasons": ["Insufficient feedback data — using baseline thresholds."],
         }
 
-    precision = metrics["precision"]
-    recall    = metrics["recall"]
-    adaptation_active = False
+    now = datetime.utcnow()
 
-    adjusted_block = base_block
-    adjusted_allow = base_allow
+    w_tp = w_fp = w_fn = w_tn = 0.0
+    for dep in evaluated:
+        age_days = 0.0
+        if dep.evaluation_timestamp:
+            age_days = (now - dep.evaluation_timestamp).total_seconds() / 86400.0
+        rw = math.exp(-decay_factor * max(age_days, 0.0))
+
+        pf = bool(dep.predicted_failure)
+        af = bool(dep.actual_outcome)
+        if pf and af:
+            w_tp += rw
+        elif not pf and not af:
+            w_tn += rw
+        elif pf and not af:
+            w_fp += rw
+        else:
+            w_fn += rw
+
+    precision = round(w_tp / (w_tp + w_fp), 4) if (w_tp + w_fp) > 0 else None
+    recall    = round(w_tp / (w_tp + w_fn), 4) if (w_tp + w_fn) > 0 else None
+
+    logger.info(
+        f"[ML:9.3] decay_thresholds computed precision={precision} recall={recall} "
+        f"λ={decay_factor} n={len(evaluated)}"
+    )
+
+    reasons = []
+    adaptation_active = False
+    adjusted_block    = base_block
+    adjusted_allow    = base_allow
     adjusted_ml_block = base_ml_block
 
-    # Too many False Positives → model too strict → relax thresholds
     if precision is not None and precision < 0.65:
         adjusted_block    = min(base_block + 5.0, 85.0)
         adjusted_ml_block = min(base_ml_block + 0.05, 0.90)
         adaptation_active = True
         reasons.append(
             f"Adaptive Policy: Low precision ({precision:.2f}) detected — "
-            f"thresholds relaxed to reduce false blocks (block→{adjusted_block}, "
-            f"ml_prob→{adjusted_ml_block:.2f})."
+            f"thresholds relaxed to reduce false blocks "
+            f"(block→{adjusted_block}, ml_prob→{adjusted_ml_block:.2f})."
         )
 
-    # Too many False Negatives → model too lenient → tighten thresholds
     if recall is not None and recall < 0.70:
         adjusted_block    = max(base_block - 5.0, 55.0)
         adjusted_ml_block = max(base_ml_block - 0.10, 0.65)
         adaptation_active = True
         reasons.append(
             f"Adaptive Policy: Low recall ({recall:.2f}) detected — "
-            f"thresholds tightened to prevent missed failures (block→{adjusted_block}, "
-            f"ml_prob→{adjusted_ml_block:.2f})."
+            f"thresholds tightened to prevent missed failures "
+            f"(block→{adjusted_block}, ml_prob→{adjusted_ml_block:.2f})."
         )
 
     if not reasons:
         reasons.append(
-            f"Adaptive Policy: Metrics healthy (precision={precision:.2f}, "
-            f"recall={recall:.2f}) — baseline thresholds retained."
+            f"Adaptive Policy: Metrics healthy "
+            f"(precision={precision}, recall={recall}) — baseline thresholds retained."
         )
+
+    threshold_state = {
+        "block": adjusted_block, "allow": adjusted_allow,
+        "ml": adjusted_ml_block, "active": adaptation_active,
+    }
+    threshold_version = hashlib.sha256(
+        json.dumps(threshold_state, sort_keys=True).encode()
+    ).hexdigest()[:16]
 
     return {
         "risk_block_threshold": adjusted_block,
         "risk_allow_threshold": adjusted_allow,
         "ml_block_probability": adjusted_ml_block,
         "adaptation_active": adaptation_active,
+        "threshold_version": threshold_version,
         "reasons": reasons,
     }
