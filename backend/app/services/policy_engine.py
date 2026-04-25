@@ -49,8 +49,11 @@ class PolicyContext:
     signal_weights: Dict[str, float] = field(default_factory=dict)
     decision_score: float = 0.0
     anomaly_flags: List[Dict[str, Any]] = field(default_factory=list)
-    policy_version: str = "9.3.0"
+    policy_version: str = "9.3.1"
     cold_start: bool = True
+    # Final Refinement
+    score_block_threshold: float = 75.0
+    service_memory: Dict[str, Any] = field(default_factory=dict)
 
 
 class PolicyDecision:
@@ -170,17 +173,16 @@ def _compute_confidence_score(context: PolicyContext, decision: str) -> float:
 
     base = min(sum(signals), 1.0)
 
-    # Phase 9.3: Anomaly penalty — each DIVERGENCE anomaly reduces confidence
-    divergence_count = sum(
-        1 for a in context.anomaly_flags if a.get("type") == "DIVERGENCE"
+    # Final Refinement: proportional anomaly penalty (impact_score-weighted)
+    anomaly_penalty = sum(
+        a.get("impact_score", 0.10) * 0.15
+        for a in context.anomaly_flags
     )
-    penalty = divergence_count * 0.10
 
     # Cold-start penalty
-    if context.cold_start:
-        penalty += 0.10
+    cold_penalty = 0.10 if context.cold_start else 0.0
 
-    return round(max(0.0, base - penalty), 4)
+    return round(max(0.0, base - anomaly_penalty - cold_penalty), 4)
 
 
 # ---------------------------------------------------------------------------
@@ -335,12 +337,14 @@ def _apply_decision_score_guidance(
     decision: str,
     reasoning: List[str],
     decision_score: float,
+    dynamic_threshold: float = 75.0,
 ) -> tuple[str, List[str]]:
-    """Phase 9.3: Hybrid score can escalate within the intermediate zone."""
-    if decision == "WARN" and decision_score >= 75.0:
+    """Final Refinement: Uses dynamic adaptive threshold instead of hardcoded 75."""
+    if decision == "WARN" and decision_score >= dynamic_threshold:
         decision = "BLOCK"
         reasoning.append(
-            f"Meta-learning: decision_score {decision_score:.1f} ≥ 75 escalates WARN → BLOCK"
+            f"Meta-learning: effective_score {decision_score:.1f} ≥ "
+            f"dynamic threshold {dynamic_threshold:.1f} escalates WARN → BLOCK"
         )
     return decision, reasoning
 
@@ -361,21 +365,31 @@ def determine_decision(context: PolicyContext) -> PolicyDecision:
         context, eff_block, eff_allow, eff_ml_block_prob
     )
 
-    # Stage 2: Anomaly escalation
+    # Stage 2: Anomaly escalation (proportional — only escalates if impact_score > threshold)
     decision, reasoning = _apply_anomaly_escalations(
         decision, reasoning, context.anomaly_flags
     )
 
-    # Stage 3: Hybrid decision_score guidance (intermediate zone only)
+    # Stage 3a: Compute initial confidence for effective_score dampening
+    initial_confidence = _compute_confidence_score(context, decision)
+
+    # Stage 3b: Confidence dampening on decision_score (Final Refinement)
+    # At zero confidence, effective_score collapses to neutral 50 — prevents noise-driven extremes
+    effective_score = (
+        context.decision_score * initial_confidence
+        + 50.0 * (1.0 - initial_confidence)
+    )
+
+    # Stage 4: Hybrid score guidance using DYNAMIC threshold from meta-learning
+    dynamic_block_threshold = context.score_block_threshold  # replaces hardcoded 75
     if decision not in ("BLOCK",) or override_reason is None:
         decision, reasoning = _apply_decision_score_guidance(
-            decision, reasoning, context.decision_score
+            decision, reasoning, effective_score, dynamic_block_threshold
         )
 
-    # Stage 4: Confidence-aware overrides
-    initial_confidence = _compute_confidence_score(context, decision)
+    # Stage 5: Confidence-aware overrides
     decision, conf_override, reasoning = _apply_confidence_overrides(
-        decision, reasoning, initial_confidence, context.decision_score
+        decision, reasoning, initial_confidence, effective_score
     )
     if conf_override:
         override_reason = conf_override
@@ -386,6 +400,12 @@ def determine_decision(context: PolicyContext) -> PolicyDecision:
 
     if not reasoning:
         reasoning.append("All indicators within acceptable bounds.")
+
+    # Final Refinement: Ranked reasoning — prefix primary/secondary factors
+    if len(reasoning) >= 1:
+        reasoning[0] = f"Primary factor: {reasoning[0]}"
+    if len(reasoning) >= 2:
+        reasoning[1] = f"Secondary factor: {reasoning[1]}"
 
     # Final confidence after all mutations
     final_confidence = _compute_confidence_score(context, decision)
@@ -522,8 +542,10 @@ def evaluate_intelligent_policy(
         signal_weights=meta.get("signal_weights", {}),
         decision_score=meta.get("decision_score", 0.0),
         anomaly_flags=meta.get("anomaly_flags", []),
-        policy_version=meta.get("policy_version", "9.3.0"),
+        policy_version=meta.get("policy_version", "9.3.1"),
         cold_start=meta.get("cold_start", True),
+        score_block_threshold=meta.get("score_block_threshold", 75.0),
+        service_memory=meta.get("service_memory", {}),
     )
 
     policy_decision = determine_decision(context)
