@@ -1,24 +1,28 @@
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import json
+from dataclasses import dataclass, field
+import logging
 
 from ..models.deployment import Deployment
 from ..config import settings
 
+logger = logging.getLogger(__name__)
 
 RISK_ALLOW_THRESHOLD = settings.RISK_ALLOW_THRESHOLD
 RISK_BLOCK_THRESHOLD = settings.RISK_BLOCK_THRESHOLD
 
-SEVERITY_OVERRIDE_MAP = {
-    "CRITICAL": "BLOCK",
-    "HIGH": "BLOCK",
-    "MEDIUM": "WARN",
-    "WARNING": "WARN",
-    "LOW": "ALLOW",
-}
-
 SENSITIVE_MODULES = ["auth/", "database/", "payments/", "credentials/", "config/"]
 
+@dataclass
+class PolicyContext:
+    risk_score: float
+    failure_probability: float
+    alerts_summary: Dict[str, Any]
+    affected_modules: List[str]
+    recommendations: List[str]
+    deployment_history: List[Dict[str, Any]]
+    historical_failures: int
 
 class PolicyDecision:
     def __init__(
@@ -26,6 +30,7 @@ class PolicyDecision:
         decision: str,
         risk_score: float,
         risk_level: str,
+        reasoning: List[str],
         recommendations: List[str],
         message: str,
         override_reason: Optional[str] = None,
@@ -35,6 +40,7 @@ class PolicyDecision:
         self.decision = decision
         self.risk_score = risk_score
         self.risk_level = risk_level
+        self.reasoning = reasoning
         self.recommendations = recommendations
         self.message = message
         self.override_reason = override_reason
@@ -46,6 +52,7 @@ class PolicyDecision:
             "decision": self.decision,
             "risk_score": self.risk_score,
             "risk_level": self.risk_level,
+            "reasoning": self.reasoning,
             "recommendations": self.recommendations,
             "message": self.message,
             "override_reason": self.override_reason,
@@ -53,29 +60,7 @@ class PolicyDecision:
             "affected_modules": self.affected_modules
         }
 
-
-def apply_risk_thresholds(risk_score: float) -> str:
-    """Apply base risk score thresholds to determine decision."""
-    if risk_score < RISK_ALLOW_THRESHOLD:
-        return "ALLOW"
-    elif risk_score <= RISK_BLOCK_THRESHOLD:
-        return "WARN"
-    else:
-        return "BLOCK"
-
-
-def evaluate_alert_severity(deployment: Deployment) -> Optional[str]:
-    """Extract highest alert severity from deployment's alert history."""
-    from ..models.alerts import Alert
-    
-    if not deployment or not deployment.id:
-        return None
-    
-    return None
-
-
 def _has_sensitive_modifications(affected_modules: List[str]) -> bool:
-    """Check if any affected modules are sensitive."""
     if not affected_modules:
         return False
     return any(
@@ -83,147 +68,155 @@ def _has_sensitive_modifications(affected_modules: List[str]) -> bool:
         for mod in affected_modules
     )
 
-
-def _escalate_for_sensitive_modules(
-    base_decision: str,
-    affected_modules: List[str]
-) -> str:
-    """Escalate decision if sensitive modules are affected."""
-    if _has_sensitive_modifications(affected_modules):
-        if base_decision == "ALLOW":
-            return "WARN"
-        elif base_decision == "WARN":
-            return "BLOCK"
-    return base_decision
-
-
-def _check_repeated_incidents(deployment: Deployment) -> bool:
-    """Check for repeated incidents in deployment history."""
-    if not deployment or not deployment.historical_failures:
-        return False
-    return deployment.historical_failures >= 3
-
-
-def determine_decision(
-    risk_score: float,
-    risk_level: str,
-    alert_severity: Optional[str],
-    affected_modules: List[str],
-    historical_failures: int
-) -> PolicyDecision:
-    """Apply all decision rules to determine final policy decision."""
-    
-    base_decision = apply_risk_thresholds(risk_score)
-    override_reason = None
-    final_decision = base_decision
-    
-    if alert_severity:
-        severity_override = SEVERITY_OVERRIDE_MAP.get(alert_severity.upper())
-        if severity_override and severity_override != "ALLOW":
-            if severity_override == "BLOCK":
-                final_decision = "BLOCK"
-                override_reason = f"Alert severity: {alert_severity}"
-            elif severity_override == "WARN" and final_decision == "ALLOW":
-                final_decision = "WARN"
-                override_reason = f"Alert severity: {alert_severity}"
-    
-    final_decision = _escalate_for_sensitive_modules(final_decision, affected_modules)
-    
-    if historical_failures >= 3:
-        final_decision = "BLOCK"
-        override_reason = "Repeated incidents detected" if not override_reason else override_reason
-    
-    message = _generate_decision_message(final_decision, risk_score, override_reason)
-    
-    return PolicyDecision(
-        decision=final_decision,
-        risk_score=risk_score,
-        risk_level=risk_level,
-        recommendations=_generate_recommendations(final_decision, risk_score, alert_severity),
-        message=message,
-        override_reason=override_reason,
-        alert_severity=alert_severity,
-        affected_modules=affected_modules
-    )
-
-
-def _generate_decision_message(decision: str, risk_score: float, override_reason: Optional[str]) -> str:
-    """Generate human-readable decision message."""
-    base_messages = {
-        "ALLOW": f"Deployment permitted. Risk score {risk_score:.1f} is below threshold.",
-        "WARN": f"Deployment flagged with warnings. Risk score {risk_score:.1f} requires attention.",
-        "BLOCK": f"Deployment blocked. Risk score {risk_score:.1f} exceeds safe threshold."
-    }
-    
-    message = base_messages.get(decision, "Unknown decision")
-    
-    if override_reason:
-        message += f" Override: {override_reason}"
-    
-    return message
-
-
 def _generate_recommendations(
     decision: str,
     risk_score: float,
     alert_severity: Optional[str]
 ) -> List[str]:
-    """Generate actionable recommendations based on decision."""
     recs = []
-    
     if decision == "ALLOW":
         recs.append("Continue with standard monitoring")
-    
     elif decision == "WARN":
         if risk_score > 60:
             recs.append("Consider canary deployment first")
-        if alert_severity:
+        if alert_severity and alert_severity in ["HIGH", "CRITICAL"]:
             recs.append(f"Review {alert_severity} severity alerts")
         recs.append("Enable enhanced logging")
-    
     elif decision == "BLOCK":
         recs.append("Address high-risk factors before deploying")
         recs.append("Consider breaking into smaller deployments")
         recs.append("Run additional manual QA checks")
-    
     return recs
 
+def determine_decision(context: PolicyContext) -> PolicyDecision:
+    decision = "ALLOW"
+    reasoning = []
+    override_reason = None
+    
+    # 1. CRITICAL Alerts
+    max_severity = context.alerts_summary.get("max_severity", "LOW")
+    if max_severity == "CRITICAL":
+        decision = "BLOCK"
+        reasoning.append(f"Critical alerts detected for service")
+        override_reason = "CRITICAL alerts present"
 
-def evaluate_policy(
-    deployment: Deployment,
-    alert_severity: Optional[str] = None,
-    affected_modules: Optional[List[str]] = None
-) -> PolicyDecision:
-    """
-    Main entry point for policy evaluation.
-    Aggregates all intelligence inputs and determines deployment decision.
-    """
-    risk_score = deployment.risk_score or 0.0
-    risk_level = deployment.risk_level or "LOW"
-    historical_failures = deployment.historical_failures or 0
+    # 2. Repeated Failures
+    elif context.historical_failures >= 3:
+        decision = "BLOCK"
+        reasoning.append(f"Repeated failures observed (>= 3 recent failures)")
+        override_reason = "Repeated historical failures"
+        
+    # 3. ML Prediction Failure
+    elif context.failure_probability > 0.8:
+        decision = "BLOCK"
+        reasoning.append(f"High ML failure probability detected ({context.failure_probability:.2f})")
+        override_reason = "ML prediction indicates BLOCK"
+
+    # 4. Risk Score Threat
+    elif context.risk_score > RISK_BLOCK_THRESHOLD:
+        decision = "BLOCK"
+        reasoning.append(f"Risk score ({context.risk_score}) exceeds block threshold")
+        
+    else:
+        # 5. Warnings
+        if max_severity in ["HIGH", "MEDIUM"]:
+            decision = "WARN"
+            reasoning.append(f"Elevated alert severity: {max_severity}")
+            override_reason = f"Alert severity {max_severity}"
+        
+        if 0.5 <= context.failure_probability <= 0.8:
+            decision = "WARN"
+            reasoning.append(f"Warning ML failure probability detected ({context.failure_probability:.2f})")
+            
+        if context.risk_score > RISK_ALLOW_THRESHOLD:
+            decision = "WARN"
+            reasoning.append(f"Risk score ({context.risk_score}) exceeds allow threshold")
+
+        # 6. Sensitivity Weighting
+        if _has_sensitive_modifications(context.affected_modules):
+            reasoning.append("Sensitive core modules modified (Auth/DB/Payments)")
+            if decision == "ALLOW":
+                decision = "WARN"
+                override_reason = "Sensitive modules modified"
+            elif decision == "WARN":
+                decision = "BLOCK"
+                override_reason = "Sensitive modules escalating warning to block"
+
+    if decision == "ALLOW" and not reasoning:
+        reasoning.append("All indicators within acceptable bounds.")
+
+    base_messages = {
+        "ALLOW": f"Deployment permitted. Risk score {context.risk_score:.1f} is acceptable.",
+        "WARN": f"Deployment flagged with warnings. Risk score {context.risk_score:.1f} requires attention.",
+        "BLOCK": f"Deployment blocked. Risk score {context.risk_score:.1f} or other factors exceed safe threshold."
+    }
     
-    modules = affected_modules or []
-    
-    if deployment.sensitive_files:
-        import json
-        try:
-            if isinstance(deployment.sensitive_files, str):
-                modules = json.loads(deployment.sensitive_files)
-            elif isinstance(deployment.sensitive_files, list):
-                modules = deployment.sensitive_files
-        except (json.JSONDecodeError, TypeError, AttributeError):
-            pass
-    
-    return determine_decision(
-        risk_score=risk_score,
+    # Calculate Risk Level manually to ensure it's in sync
+    risk_level = "LOW"
+    if context.risk_score >= RISK_BLOCK_THRESHOLD or decision == "BLOCK":
+        risk_level = "HIGH"
+    elif context.risk_score >= RISK_ALLOW_THRESHOLD or decision == "WARN":
+        risk_level = "MEDIUM"
+
+    message = base_messages.get(decision, "Unknown decision")
+    if override_reason:
+        message += f" Override: {override_reason}"
+
+    return PolicyDecision(
+        decision=decision,
+        risk_score=context.risk_score,
         risk_level=risk_level,
-        alert_severity=alert_severity,
-        affected_modules=modules,
-        historical_failures=historical_failures
+        reasoning=reasoning,
+        recommendations=_generate_recommendations(decision, context.risk_score, max_severity),
+        message=message,
+        override_reason=override_reason,
+        alert_severity=max_severity if max_severity != "LOW" else None,
+        affected_modules=context.affected_modules
     )
 
+def evaluate_intelligent_policy(
+    db_session: Any,
+    deployment: Deployment,
+    affected_modules: Optional[List[str]] = None,
+    risk_score: float = 0.0,
+    historical_failures: int = 0
+) -> PolicyDecision:
+    # Build Policy Context
+    
+    # ML Engine Output wrapper
+    failure_prob = 0.0
+    try:
+        from .ml_engine import ml_engine
+        if ml_engine.model:
+            _, _, failure_prob, _ = ml_engine.predict_risk(deployment)
+    except Exception as e:
+        logger.warning(f"ML Engine prediction failed: {e}. Falling back to 0.0")
+
+    # Alert Service wrapper
+    alerts_summary = {"max_severity": "LOW", "recent_alerts_count": 0, "spikes_detected": False}
+    repo_name = deployment.repo_name if deployment else ""
+    try:
+        if db_session and repo_name:
+            from .alert_service import get_alerts_summary
+            alerts_summary = get_alerts_summary(db_session, repo_name)
+    except Exception as e:
+        logger.warning(f"Alert Service failed: {e}. Falling back to empty alerts.")
+
+    context = PolicyContext(
+        risk_score=deployment.risk_score if deployment and deployment.risk_score is not None else risk_score,
+        failure_probability=failure_prob,
+        alerts_summary=alerts_summary,
+        affected_modules=affected_modules or [],
+        recommendations=[],
+        deployment_history=[], # Omitted for scope; `historical_failures` is used instead
+        historical_failures=deployment.historical_failures if deployment and deployment.historical_failures is not None else historical_failures
+    )
+
+    return determine_decision(context)
 
 def evaluate_from_analysis(
+    db_session: Any,
+    deployment: Deployment,
     risk_score: float,
     risk_level: str,
     risk_factors: List[str],
@@ -232,15 +225,37 @@ def evaluate_from_analysis(
     historical_failures: int = 0
 ) -> PolicyDecision:
     """
-    Policy evaluation that works directly with analysis results
-    (for cases where Deployment object is not yet persisted).
+    Adapter for older evaluate_from_analysis calls to use the intelligent policy engine.
     """
     modules = affected_modules or []
     
-    return determine_decision(
-        risk_score=risk_score,
-        risk_level=risk_level,
-        alert_severity=alert_severity,
+    return evaluate_intelligent_policy(
+        db_session=db_session,
+        deployment=deployment,
         affected_modules=modules,
+        risk_score=risk_score,
         historical_failures=historical_failures
+    )
+
+def evaluate_policy(
+    deployment: Deployment,
+    alert_severity: Optional[str] = None,
+    affected_modules: Optional[List[str]] = None,
+    db_session: Any = None
+) -> PolicyDecision:
+    """Backward compatibility wrapper."""
+    modules = affected_modules or []
+    if deployment.sensitive_files:
+        try:
+            if isinstance(deployment.sensitive_files, str):
+                modules = json.loads(deployment.sensitive_files)
+            elif isinstance(deployment.sensitive_files, list):
+                modules = deployment.sensitive_files
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            pass
+            
+    return evaluate_intelligent_policy(
+        db_session=db_session,
+        deployment=deployment,
+        affected_modules=modules
     )
