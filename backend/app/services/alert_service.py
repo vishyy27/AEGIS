@@ -332,3 +332,38 @@ def run_alert_intelligence_pipeline(db: Session, deployment: Deployment) -> None
     )
     db.add(alert)
     db.commit()
+
+
+def get_alerts_summary(db: Session, repo_name: str) -> Dict[str, Any]:
+    """Returns a summary of recent alerts for context aggregation."""
+    if not repo_name:
+        return {"max_severity": "LOW", "recent_alerts_count": 0, "spikes_detected": False}
+        
+    twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=ALERT_BURST_WINDOW_HOURS)
+    recent_alerts = (
+        db.query(Alert)
+        .filter(Alert.affected_service == repo_name)
+        .filter(Alert.timestamp >= twenty_four_hours_ago)
+        .all()
+    )
+    
+    if not recent_alerts:
+        return {"max_severity": "LOW", "recent_alerts_count": 0, "spikes_detected": False}
+        
+    severity_order = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "WARNING": 1, "LOW": 0}
+    highest = "LOW"
+    spikes = False
+    
+    for alert in recent_alerts:
+        sev = alert.severity or "LOW"
+        if severity_order.get(sev.upper(), 0) > severity_order.get(highest, 0):
+            highest = sev.upper()
+        if alert.alert_type == "INCIDENT_PATTERN":
+            spikes = True
+            
+    return {
+        "max_severity": highest,
+        "recent_alerts_count": len(recent_alerts),
+        "spikes_detected": spikes or len(recent_alerts) > ALERT_BURST_THRESHOLD
+    }
+
