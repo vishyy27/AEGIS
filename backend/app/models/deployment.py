@@ -75,6 +75,11 @@ class Deployment(Base):
     policy_confidence_score = Column(Float, nullable=True)  # [0.0, 1.0]
     evaluation_timestamp = Column(DateTime, nullable=True)  # When outcome was registered
 
+    # Phase 9.3 Meta-Learning Versioning & Scoring
+    policy_version = Column(String, nullable=True)       # e.g. "9.3.0"
+    threshold_version = Column(String, nullable=True)    # SHA-256[:16] fingerprint
+    decision_score = Column(Float, nullable=True)        # Composite [0.0, 100.0]
+
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
