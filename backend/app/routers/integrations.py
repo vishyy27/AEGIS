@@ -128,10 +128,11 @@ async def webhook_receiver(
         decision=policy_decision.decision,
         risk_score=policy_decision.risk_score,
         risk_level=policy_decision.risk_level,
+        confidence_score=policy_decision.confidence_score,
         reasoning=policy_decision.reasoning,
         recommendations=policy_decision.recommendations,
         message=policy_decision.message,
         override_reason=policy_decision.override_reason,
         alert_severity=policy_decision.alert_severity,
-        affected_modules=policy_decision.affected_modules
+        affected_modules=policy_decision.affected_modules,
     )
