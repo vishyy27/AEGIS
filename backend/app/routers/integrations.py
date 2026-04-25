@@ -104,8 +104,13 @@ async def webhook_receiver(
     # Trigger analysis pipeline
     analysis_response = evaluate_deployment(analysis_request, db, background_tasks)
 
+    # Persist decision to deployment
+    deployment = db.query(Deployment).filter(Deployment.id == analysis_response.deployment_id).first()
+
     # Evaluate policy decision
     policy_decision = evaluate_from_analysis(
+        db_session=db,
+        deployment=deployment,
         risk_score=analysis_response.risk_score,
         risk_level=analysis_response.risk_level,
         risk_factors=analysis_response.risk_factors,
@@ -114,8 +119,6 @@ async def webhook_receiver(
         historical_failures=analysis_request.historical_failures
     )
 
-    # Persist decision to deployment
-    deployment = db.query(Deployment).filter(Deployment.id == analysis_response.deployment_id).first()
     if deployment:
         deployment.deployment_decision = policy_decision.decision
         deployment.decision_timestamp = datetime.utcnow()
@@ -125,6 +128,7 @@ async def webhook_receiver(
         decision=policy_decision.decision,
         risk_score=policy_decision.risk_score,
         risk_level=policy_decision.risk_level,
+        reasoning=policy_decision.reasoning,
         recommendations=policy_decision.recommendations,
         message=policy_decision.message,
         override_reason=policy_decision.override_reason,
