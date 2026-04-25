@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 
 class IntegrationBase(BaseModel):
@@ -23,6 +23,12 @@ class PolicyDecisionResponse(BaseModel):
     risk_score: float
     risk_level: str
     confidence_score: float = 0.0
+    # Phase 9.3 Meta-Learning fields
+    decision_score: Optional[float] = None
+    signal_weights: Optional[Dict[str, float]] = None
+    anomaly_flags: List[str] = []
+    policy_version: Optional[str] = None
+    # Explainability & recommendations (existing)
     reasoning: List[str] = []
     recommendations: List[str]
     message: str
