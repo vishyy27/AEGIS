@@ -270,3 +270,125 @@ class MLEngine:
         return ml_risk_score, ml_risk_level, failure_prob, top_factors
 
 ml_engine = MLEngine()
+
+
+def analyze_prediction_error(db: Session, limit: int = 50) -> dict:
+    """
+    Phase 9.2: Compute rolling classification metrics over last `limit` evaluated deployments.
+    Returns accuracy, precision, recall, and per-class counts (TP/TN/FP/FN).
+    """
+    from ..models.deployment import Deployment as DeploymentModel
+
+    evaluated = (
+        db.query(DeploymentModel)
+        .filter(
+            DeploymentModel.prediction_correct.isnot(None),
+            DeploymentModel.actual_outcome.isnot(None),
+            DeploymentModel.predicted_failure.isnot(None),
+        )
+        .order_by(DeploymentModel.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+
+    if not evaluated:
+        return {
+            "insufficient_data": True,
+            "evaluated_count": 0,
+            "accuracy": None,
+            "precision": None,
+            "recall": None,
+            "tp": 0, "tn": 0, "fp": 0, "fn": 0,
+        }
+
+    tp = sum(1 for d in evaluated if d.predicted_failure and d.actual_outcome)
+    tn = sum(1 for d in evaluated if not d.predicted_failure and not d.actual_outcome)
+    fp = sum(1 for d in evaluated if d.predicted_failure and not d.actual_outcome)
+    fn = sum(1 for d in evaluated if not d.predicted_failure and d.actual_outcome)
+    total = len(evaluated)
+
+    accuracy  = round((tp + tn) / total, 4) if total > 0 else None
+    precision = round(tp / (tp + fp), 4) if (tp + fp) > 0 else None
+    recall    = round(tp / (tp + fn), 4) if (tp + fn) > 0 else None
+
+    logger.info(
+        f"[ML:9.2] metrics_computed evaluated={total} "
+        f"accuracy={accuracy} precision={precision} recall={recall} "
+        f"TP={tp} TN={tn} FP={fp} FN={fn}"
+    )
+
+    return {
+        "insufficient_data": False,
+        "evaluated_count": total,
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "tp": tp, "tn": tn, "fp": fp, "fn": fn,
+    }
+
+
+def get_adaptive_thresholds(db: Session, limit: int = 50) -> dict:
+    """
+    Phase 9.2: Derive dynamic risk block/allow thresholds based on rolling precision/recall.
+    Returns adjusted thresholds and a human-readable explanation list.
+    """
+    from ..config import settings
+    base_block = settings.RISK_BLOCK_THRESHOLD
+    base_allow = settings.RISK_ALLOW_THRESHOLD
+    base_ml_block = 0.80
+
+    metrics = analyze_prediction_error(db, limit=limit)
+    reasons = []
+
+    if metrics["insufficient_data"]:
+        return {
+            "risk_block_threshold": base_block,
+            "risk_allow_threshold": base_allow,
+            "ml_block_probability": base_ml_block,
+            "adaptation_active": False,
+            "reasons": ["Insufficient feedback data — using baseline thresholds."],
+        }
+
+    precision = metrics["precision"]
+    recall    = metrics["recall"]
+    adaptation_active = False
+
+    adjusted_block = base_block
+    adjusted_allow = base_allow
+    adjusted_ml_block = base_ml_block
+
+    # Too many False Positives → model too strict → relax thresholds
+    if precision is not None and precision < 0.65:
+        adjusted_block    = min(base_block + 5.0, 85.0)
+        adjusted_ml_block = min(base_ml_block + 0.05, 0.90)
+        adaptation_active = True
+        reasons.append(
+            f"Adaptive Policy: Low precision ({precision:.2f}) detected — "
+            f"thresholds relaxed to reduce false blocks (block→{adjusted_block}, "
+            f"ml_prob→{adjusted_ml_block:.2f})."
+        )
+
+    # Too many False Negatives → model too lenient → tighten thresholds
+    if recall is not None and recall < 0.70:
+        adjusted_block    = max(base_block - 5.0, 55.0)
+        adjusted_ml_block = max(base_ml_block - 0.10, 0.65)
+        adaptation_active = True
+        reasons.append(
+            f"Adaptive Policy: Low recall ({recall:.2f}) detected — "
+            f"thresholds tightened to prevent missed failures (block→{adjusted_block}, "
+            f"ml_prob→{adjusted_ml_block:.2f})."
+        )
+
+    if not reasons:
+        reasons.append(
+            f"Adaptive Policy: Metrics healthy (precision={precision:.2f}, "
+            f"recall={recall:.2f}) — baseline thresholds retained."
+        )
+
+    return {
+        "risk_block_threshold": adjusted_block,
+        "risk_allow_threshold": adjusted_allow,
+        "ml_block_probability": adjusted_ml_block,
+        "adaptation_active": adaptation_active,
+        "reasons": reasons,
+    }
