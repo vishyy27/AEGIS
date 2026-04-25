@@ -6,7 +6,7 @@ AEGIS is an AI-assisted platform designed to analyze software deployments and pr
 
 The platform enables engineering teams to detect unstable deployments early, prevent production failures, and maintain safer release cycles.
 
-AEGIS combines **deployment analytics, change intelligence, alert intelligence, context-aware recommendations, and deployment stability analytics** to provide real-time and historical risk insights during the CI/CD process.
+AEGIS combines **deployment analytics, change intelligence, alert intelligence, machine learning, and meta-learning decision intelligence** to provide real-time, adaptive risk insights during the CI/CD process.
 
 ---
 
@@ -25,15 +25,15 @@ Payload Normalization
       ↓
 Code Change Intelligence Engine
       ↓
-Deployment Risk Analysis Engine
+Static Deployment Risk Analysis Engine & ML Prediction Engine
       ↓
 Alert Intelligence & Incident Detection
       ↓
-Context-Aware Recommendation Engine
+Meta-Learning Layer (Adaptive Signal Weights)
       ↓
-Deployment Stability Analytics Engine
+Intelligent Policy Engine (Decision & Confidence)
       ↓
-Database Storage
+Database Storage & Feedback Loop
       ↓
 Analytics Dashboard
 ```
@@ -50,116 +50,72 @@ The system can integrate directly with CI/CD platforms such as:
 # Core Features
 
 ## Deployment Risk Analysis
-
-Analyzes deployments using multiple indicators including commit activity, code churn, test coverage, dependency updates, and historical deployment failures to generate a deployment **risk score**.
-
----
+Analyzes deployments using multiple indicators including commit activity, code churn, test coverage, dependency updates, and historical deployment failures to generate a deterministic deployment **risk score**.
 
 ## Code Change Intelligence
-
 Evaluates file-level changes and identifies high-risk components such as authentication modules, database migrations, or payment systems.
 
----
-
 ## CI/CD Webhook Integration
-
-Receives deployment metadata from CI/CD pipelines through a webhook ingestion endpoint and automatically triggers deployment risk analysis.
-
----
+Receives deployment metadata from CI/CD pipelines through a webhook ingestion endpoint and automatically triggers deployment risk analysis synchronously within 100 milliseconds.
 
 ## Alert Intelligence & Incident Detection
-
-Detects risky deployment patterns such as:
-
-* Consecutive high-risk deployments
-* Deployment failure spikes
-* Critical component modifications
-* Sudden increases in deployment risk
-
-Alerts are automatically generated with severity classifications:
-
-* LOW
-* MEDIUM
-* HIGH
-* CRITICAL
-
----
+Detects risky deployment patterns such as consecutive high-risk deployments, failure spikes, and critical component modifications. Alerts are automatically graded by severity (LOW, MEDIUM, HIGH, CRITICAL).
 
 ## Context-Aware AI Recommendations
+Generates intelligent deployment guidance by analyzing risk factors, change intelligence signals, alert patterns, and historical deployment behavior. Recommendations are categorized and prioritized to help engineering teams reduce deployment risk.
 
-Generates intelligent deployment guidance by analyzing risk factors, change intelligence signals, alert patterns, and historical deployment behavior.
+## Deployment Stability Analytics
+Evaluates long-term deployment behavior using database-level aggregations to measure system reliability and service health, calculating success rates, incident frequencies, and service stability scores.
 
-Recommendations may include:
+## Machine Learning Risk Prediction (XGBoost)
+Incorporates a localized predictive AI engine trained dynamically on raw CI/CD telemetry. It evaluates historical features to predict a localized **probability of deployment failure**, exposing the reasoning via Explainable AI (XAI) feature impact metrics.
 
-* Increasing test coverage for high-churn modules
-* Splitting large deployments into smaller releases
-* Verifying dependency compatibility
-* Preparing rollback strategies for unstable services
+## Intelligent Policy Engine
+Evaluates conflicting logic (e.g., high ML risk vs. low static risk) through a waterfall hierarchy. It generates concrete `ALLOW`, `WARN`, or `BLOCK` decisions based on priority safety rules, providing ranked "Primary" and "Secondary" reasoning factors for full transparency. 
 
-Each recommendation is categorized and prioritized to help engineering teams reduce deployment risk.
-
----
-
-## Deployment Stability Analytics (Phase 7)
-
-Phase 7 introduces a **Deployment Stability Analytics Engine** that evaluates long-term deployment behavior to measure system reliability and service health.
-
-Unlike earlier phases that focused on individual deployments, this phase introduces **historical intelligence using database-level aggregations** for scalability and performance.
-
-### Key Capabilities
-
-* **Deployment Success Rate**
-  Calculates percentage of successful deployments over configurable time windows.
-
-* **Incident Frequency Tracking**
-  Counts incident-triggering deployments using optimized boolean filtering.
-
-* **Service Stability Score**
-  Computes reliability scores per service using aggregated failures, incidents, and risk signals.
-
-* **Risk Trend Analysis**
-  Uses SQL-based time aggregation (`AVG`, `GROUP BY`) to analyze how risk evolves over time.
-
-* **Deployment Health Index**
-  A composite reliability score derived from success rate, incident frequency, and stability metrics.
+## Self-Learning Feedback Loop & Meta-Learning
+AEGIS continuously measures its own accuracy. Actual deployment outcomes (success/failure) are captured to compute True Positives and False Negatives. 
+* **Active Signal Learning:** Uses a reward/punishment mechanism to dynamically adjust the weight of ML vs Static Risk vs Alerts based on what has historically been most accurate.
+* **Dynamic Thresholds:** Automatically adjusts strictness (Block thresholds) up or down depending on system precision and recall.
+* **Pre-Failure Anomalies:** Detects `SPIKE` risk distance, `DIVERGENCE` model disagreement, and `REVERSAL` risk patterns, scaling back decision confidence proportionally to prevent over-blocking.
 
 ---
 
-## Performance Optimization (Phase 7 Enhancement)
+# Performance Optimization 
 
-The analytics engine is designed with **database-first computation strategy**:
+The analytics and decision engines are designed with a **database-first computation strategy**:
 
 * Eliminates `.all()` memory loading
 * Uses SQL aggregation (`func.avg`, `func.count`, `func.sum`)
-* Avoids Python-side loops for large datasets
+* Retraining governors utilize asynchronous background task processing and cooldown timers
 * Prevents N+1 query patterns
 * Ensures scalability for large deployment histories
 
-This allows AEGIS to handle **high-volume deployment analytics efficiently without memory overhead**.
+This allows AEGIS to handle **high-volume deployment analytics efficiently without memory overhead**, keeping webhook latency completely negligible to the CI pipeline.
 
 ---
 
-## Deployment Analytics Dashboard
+# Deployment Analytics Dashboard
 
-The platform provides a dashboard that visualizes:
+The platform provides a comprehensive Next.js dashboard that visualizes:
 
-* Deployment risk trends
-* Incident frequency
-* Deployment success rate
-* Service stability rankings
-* Deployment health index
+* Deployment risk trends and failure probability distributions
+* Adaptive Intelligence telemetry (Live Signal Weights and Confidence Trends)
+* Pre-failure anomaly event logging
+* Incident frequency and deployment success rate
+* Service stability rankings and health indices
 
-These insights help teams monitor long-term deployment health across services.
+These insights help teams monitor long-term deployment health across services and understand exactly how AEGIS is learning their environment.
 
 ---
 
-## Secure Integration Layer
+# Secure Integration Layer
 
 Webhook authentication ensures that only authorized CI/CD systems can trigger deployment analysis.
 
 ---
 
-## Interactive API Documentation
+# Interactive API Documentation
 
 Swagger UI is available for testing and validating backend API endpoints.
 
@@ -168,21 +124,22 @@ Swagger UI is available for testing and validating backend API endpoints.
 # Technology Stack
 
 ## Backend
-
 * Python
 * FastAPI
 * Pydantic
 * SQLAlchemy
 * SQLite
+* XGBoost
+* Scikit-Learn
 
 ## Frontend
-
 * Next.js
 * TypeScript
 * React
+* Recharts
+* TailwindCSS
 
 ## DevOps
-
 * Docker
 * Docker Compose
 
@@ -191,67 +148,28 @@ Swagger UI is available for testing and validating backend API endpoints.
 # API Endpoints
 
 ## Deployment Risk Analysis
-
 **POST /api/analysis/analyze**
-
 Analyzes deployment metadata and returns a deployment risk score along with intelligent recommendations.
 
----
-
 ## CI/CD Webhook Receiver
-
 **POST /api/integrations/webhook**
+Receives deployment data directly from CI/CD pipelines, triggering the full predictive pipeline.
 
-Receives deployment data directly from CI/CD pipelines.
+## Adaptive Decision Metrics
+**GET /api/metrics/decision-intelligence**
+Returns real-time adaptive metrics, confidence scores, anomaly traces, and model drift status.
 
----
+## Feedback Loop Registration
+**POST /api/deployments/{deployment_id}/feedback**
+Registers actual successful or failed deployment outcomes to trigger model retraining and meta-learning adjustments.
 
-## Deployment Data
-
+## Analytics & Deployments
 ```
 GET /api/deployments
-GET /api/deployments/{deployment_id}
-```
-
----
-
-## Alerts & Incident Intelligence
-
-```
-GET /api/alerts
-GET /api/alerts/{alert_id}
-GET /api/alerts/incidents
-```
-
----
-
-## Dashboard Analytics
-
-```
 GET /api/dashboard/summary
-```
-
-Returns:
-
-* globalRiskScore
-* riskTrend
-* successRate
-* deploymentHealthIndex
-* serviceStabilityScore
-* incidentFrequency
-* advancedRiskTrends
-
----
-
-## Deployment Stability Insights
-
-```
+GET /api/alerts
 GET /api/insights/deployment-health
-GET /api/insights/service-stability
-GET /api/insights/risk-trends
 ```
-
-Provides time-based reliability analytics across deployments.
 
 ---
 
@@ -261,17 +179,22 @@ Provides time-based reliability analytics across deployments.
 AEGIS
 │
 ├── backend
-│   └── app
-│       ├── models
-│       ├── routers
-│       ├── schemas
-│       ├── services
-│       ├── config.py
-│       ├── database.py
-│       └── main.py
+│   ├── app
+│   │   ├── models
+│   │   ├── routers
+│   │   ├── schemas
+│   │   ├── services
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   └── main.py
+│   ├── ml
+│   │   └── models/        # Pickled XGBoost binaries
+│   └── scripts/           # Simulation & evaluation scripts
 │
 ├── frontend
 │   ├── src
+│   │   ├── app
+│   │   └── components
 │   └── public
 │
 ├── docker-compose.yml
@@ -291,19 +214,8 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Backend:
-
-```
-http://localhost:8000
-```
-
-Docs:
-
-```
-http://localhost:8000/docs
-```
-
----
+Backend: `http://localhost:8000`  
+Docs: `http://localhost:8000/docs`
 
 ## Frontend
 
@@ -313,10 +225,13 @@ npm install
 npm run dev
 ```
 
-Frontend:
+Frontend: `http://localhost:3000`
 
-```
-http://localhost:3000
+## Synthetic CI/CD Testing
+
+To observe the Artificial Intelligence dynamically adapt its thresholds, generate synthetic CI/CD traffic:
+```bash
+python backend/scripts/simulate_deployments.py --scenario crisis --count 25 --use-prod-db
 ```
 
 ---
@@ -330,16 +245,17 @@ http://localhost:3000
 * Phase 5 — Alert Intelligence & Incident Detection System
 * Phase 6 — Context-Aware AI Recommendation Engine
 * Phase 7 — Deployment Stability Analytics & Reliability Intelligence
+* Phase 8 — Machine Learning Risk Prediction Engine
+* Phase 9 — Intelligent Policy Engine, Self-Learning Feedback Loop, & Meta-Learning
 
 ---
 
 # Future Enhancements
 
-* Machine learning-based deployment risk prediction (Phase 8)
-* Real-time CI/CD pipeline monitoring
-* Advanced anomaly detection in deployments
-* Multi-service dependency risk modeling
 * Cloud-native scalability enhancements
+* MLflow Server Integration for strict model versioning
+* Integration of Graph Neural Networks (GNN) for dependency scanning
+* A/B testing framework enabling shadowed deployment policy gates
 
 ---
 
