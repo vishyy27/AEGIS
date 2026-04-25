@@ -227,29 +227,79 @@ def register_deployment_outcome(db: Session, deployment_id: int, outcome: str, b
     return True
 
 
+# ---------------------------------------------------------------------------
+# Retraining governor constants (Final Refinement)
+# ---------------------------------------------------------------------------
+_RETRAIN_TREND_WINDOW     = 10     # Rolling window for trend accuracy
+_RETRAIN_TREND_THRESHOLD  = 0.65   # Average accuracy that triggers retrain
+_RETRAIN_COOLDOWN_HOURS   = 4      # Minimum hours between consecutive retrains
+
+
 def _check_drift_and_retrain(db: Session, deployment_id: int) -> None:
     """
-    Phase 9.2: Background task — re-evaluate rolling metrics and trigger
-    ML retraining if accuracy falls below the 0.65 drift threshold.
+    Final Refinement Retraining Governor.
+    Replaces single-point accuracy check with:
+      - Rolling trend window (last _RETRAIN_TREND_WINDOW evaluations)
+      - 4-hour cooldown to prevent oscillating retrains
     """
     from .ml_engine import analyze_prediction_error
+    from datetime import datetime
+
     try:
-        metrics = analyze_prediction_error(db, limit=50)
+        # Use rolling trend window of recent evaluations
+        metrics = analyze_prediction_error(db, limit=_RETRAIN_TREND_WINDOW)
+
         if metrics["insufficient_data"]:
+            logger.info(
+                f"[ML:Final] drift_check=insufficient_data "
+                f"window={_RETRAIN_TREND_WINDOW} deployment_id={deployment_id}"
+            )
             return
 
-        accuracy = metrics.get("accuracy")
-        if accuracy is not None and accuracy < 0.65:
+        trend_accuracy = metrics.get("accuracy")
+
+        # --- Cooldown enforcement ---
+        if ml_engine.current_version:
+            try:
+                # Version format: risk_model_YYYYMMDD_HHMMSS.pkl
+                ver = (
+                    ml_engine.current_version
+                    .replace("risk_model_", "")
+                    .replace(".pkl", "")
+                )
+                trained_at = datetime.strptime(ver, "%Y%m%d_%H%M%S")
+                hours_since = (datetime.utcnow() - trained_at).total_seconds() / 3600.0
+                remaining   = _RETRAIN_COOLDOWN_HOURS - hours_since
+
+                if hours_since < _RETRAIN_COOLDOWN_HOURS:
+                    logger.info(
+                        f"[ML:Final] retrain_skipped=cooldown_active "
+                        f"hours_since={hours_since:.1f} "
+                        f"cooldown={_RETRAIN_COOLDOWN_HOURS}h "
+                        f"remaining={remaining:.1f}h"
+                    )
+                    return
+            except (ValueError, AttributeError):
+                pass  # Can't parse version → skip cooldown, proceed normally
+
+        # --- Trigger decision ---
+        if trend_accuracy is not None and trend_accuracy < _RETRAIN_TREND_THRESHOLD:
             logger.warning(
-                f"[ML:9.2] drift_triggered=True accuracy={accuracy:.4f} "
-                f"action=background_retrain deployment_id={deployment_id}"
+                f"[ML:Final] drift_triggered=True "
+                f"trend_accuracy={trend_accuracy:.4f} "
+                f"window={_RETRAIN_TREND_WINDOW} "
+                f"threshold={_RETRAIN_TREND_THRESHOLD} "
+                f"action=retrain deployment_id={deployment_id}"
             )
             ml_engine.train_model(db)
         else:
             logger.info(
-                f"[ML:9.2] drift_check=OK accuracy={accuracy} "
-                f"deployment_id={deployment_id}"
+                f"[ML:Final] drift_check=OK "
+                f"trend_accuracy={trend_accuracy} "
+                f"window={_RETRAIN_TREND_WINDOW} deployment_id={deployment_id}"
             )
+
     except Exception as e:
-        logger.error(f"[ML:9.2] drift_check_failed={e}")
+        logger.error(f"[ML:Final] drift_check_failed={e}")
+
 
