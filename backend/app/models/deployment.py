@@ -69,7 +69,12 @@ class Deployment(Base):
     # Phase 9 Policy Engine (optional, backward-safe)
     deployment_decision = Column(String, nullable=True)
     decision_timestamp = Column(DateTime, nullable=True)
-    
+
+    # Phase 9.2 Self-Learning Feedback Tracking
+    error_type = Column(String, nullable=True)           # TP, TN, FP, FN
+    policy_confidence_score = Column(Float, nullable=True)  # [0.0, 1.0]
+    evaluation_timestamp = Column(DateTime, nullable=True)  # When outcome was registered
+
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
