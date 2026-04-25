@@ -8,6 +8,7 @@ import RiskChart from "@/components/RiskChart";
 import RiskFactors from "@/components/RiskFactors";
 import RecommendationPanel from "@/components/RecommendationPanel";
 import DeploymentTable from "@/components/DeploymentTable";
+import IntelligenceDashboard from "@/components/IntelligenceDashboard";
 
 interface SummaryData {
   globalRiskScore: number;
@@ -112,6 +113,11 @@ export default function Dashboard() {
         <div className="lg:col-span-1">
           <RiskFactors factors={summary?.riskFactors || []} />
         </div>
+      </div>
+
+      {/* Advanced Intelligence Telemetry */}
+      <div className="w-full">
+        <IntelligenceDashboard />
       </div>
 
       {/* Recommendations + Deployments */}
