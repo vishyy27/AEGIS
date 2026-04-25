@@ -22,6 +22,7 @@ class PolicyDecisionResponse(BaseModel):
     decision: str  # ALLOW, WARN, BLOCK
     risk_score: float
     risk_level: str
+    confidence_score: float = 0.0
     reasoning: List[str] = []
     recommendations: List[str]
     message: str
