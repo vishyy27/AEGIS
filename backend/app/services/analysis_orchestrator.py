@@ -173,31 +173,83 @@ def evaluate_deployment(request: AnalysisRequest, db: Session, background_tasks:
     )
 
 
-def register_deployment_outcome(db: Session, deployment_id: int, outcome: str) -> bool:
+def register_deployment_outcome(db: Session, deployment_id: int, outcome: str, background_tasks: BackgroundTasks = None) -> bool:
     """
-    Phase 8.3/8.4 Feedback Loop Entrypoint.
+    Phase 9.2 Feedback Loop Entrypoint.
     Called when the CI/CD pipeline definitively reports Success or Failure.
+    Classifies prediction as TP/TN/FP/FN, stores evaluation telemetry,
+    and triggers adaptive drift checks asynchronously.
     """
+    from datetime import datetime
+    from .ml_engine import analyze_prediction_error
+
     deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
     if not deployment:
-        logger.warning(f"[ML] feedback_rejected=True reason=missing_deployment id={deployment_id}")
+        logger.warning(f"[ML:9.2] feedback_rejected=True reason=missing_deployment id={deployment_id}")
         return False
-        
+
     if deployment.prediction_correct is not None:
-        logger.info(f"[ML] feedback_idempotent=True id={deployment_id}")
+        logger.info(f"[ML:9.2] feedback_idempotent=True id={deployment_id}")
         return True
-        
+
     deployment.deployment_outcome = outcome
-    
-    # Process feedback loop telemetry
     actual_failure = outcome.lower() in ["failure", "error", "rollback", "failed"]
     deployment.actual_outcome = actual_failure
-    
+    deployment.evaluation_timestamp = datetime.utcnow()
+
+    # ML-backed classification
     if deployment.ml_used and deployment.ml_prediction_prob is not None:
         predicted_failure = deployment.ml_prediction_prob >= 0.5
         deployment.predicted_failure = predicted_failure
         deployment.prediction_correct = (predicted_failure == actual_failure)
-        logger.info(f"[ML] feedback_processed=True id={deployment_id} correct={deployment.prediction_correct}")
-        
+
+        # Classify error type: TP / TN / FP / FN
+        if predicted_failure and actual_failure:
+            deployment.error_type = "TP"
+        elif not predicted_failure and not actual_failure:
+            deployment.error_type = "TN"
+        elif predicted_failure and not actual_failure:
+            deployment.error_type = "FP"   # Model too strict
+        else:
+            deployment.error_type = "FN"   # Model too lenient
+
+        logger.info(
+            f"[ML:9.2] feedback_processed=True id={deployment_id} "
+            f"correct={deployment.prediction_correct} error_type={deployment.error_type}"
+        )
+
     db.commit()
+
+    # Async drift check — never block the caller
+    if background_tasks is not None:
+        background_tasks.add_task(_check_drift_and_retrain, db, deployment_id)
+
     return True
+
+
+def _check_drift_and_retrain(db: Session, deployment_id: int) -> None:
+    """
+    Phase 9.2: Background task — re-evaluate rolling metrics and trigger
+    ML retraining if accuracy falls below the 0.65 drift threshold.
+    """
+    from .ml_engine import analyze_prediction_error
+    try:
+        metrics = analyze_prediction_error(db, limit=50)
+        if metrics["insufficient_data"]:
+            return
+
+        accuracy = metrics.get("accuracy")
+        if accuracy is not None and accuracy < 0.65:
+            logger.warning(
+                f"[ML:9.2] drift_triggered=True accuracy={accuracy:.4f} "
+                f"action=background_retrain deployment_id={deployment_id}"
+            )
+            ml_engine.train_model(db)
+        else:
+            logger.info(
+                f"[ML:9.2] drift_check=OK accuracy={accuracy} "
+                f"deployment_id={deployment_id}"
+            )
+    except Exception as e:
+        logger.error(f"[ML:9.2] drift_check_failed={e}")
+
