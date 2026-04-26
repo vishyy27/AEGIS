@@ -26,7 +26,7 @@ export default function IntelligenceDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/metrics/decision-intelligence")
+    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/metrics/decision-intelligence`)
       .then((res) => res.json())
       .then((data) => {
         setMetrics(data);
