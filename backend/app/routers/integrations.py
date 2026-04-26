@@ -32,23 +32,23 @@ async def verify_security(request: Request, api_key: str):
     headers = request.headers
     platform = detect_cicd_platform(dict(headers))
 
-    # 2️⃣ GitHub signature verification (optional)
-    if platform == "github":
-        signature = headers.get("X-Hub-Signature-256")
+    # Webhook signature verification (HMAC)
+    signature = headers.get("X-Aegis-Signature")
+    
+    if settings.WEBHOOK_SECRET:
+        if not signature:
+            raise HTTPException(status_code=401, detail="Missing X-Aegis-Signature header")
+            
+        expected_signature = "sha256=" + hmac.new(
+            settings.WEBHOOK_SECRET.encode(),
+            body,
+            hashlib.sha256
+        ).hexdigest()
 
-        if signature and settings.GITHUB_WEBHOOK_SECRET:
-            expected_signature = "sha256=" + hmac.new(
-                settings.GITHUB_WEBHOOK_SECRET.encode(),
-                body,
-                hashlib.sha256
-            ).hexdigest()
-
-            if not hmac.compare_digest(signature, expected_signature):
-                raise HTTPException(status_code=401, detail="Invalid GitHub signature")
-
-            return platform
-
-    # 3️⃣ API token verification
+        if not hmac.compare_digest(signature, expected_signature):
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+            
+    # API token verification fallback/addition
     if api_key != settings.AEGIS_SECRET_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid or missing X-AEGIS-TOKEN")
 
