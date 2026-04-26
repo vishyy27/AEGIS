@@ -16,6 +16,11 @@ class Settings(BaseSettings):
 
     # CI/CD webhook security token
     AEGIS_SECRET_TOKEN: str = "dev-token-123"
+    
+    # Production Variables
+    MODEL_PATH: str = "ml/models/deployment_risk_model.pkl"
+    WEBHOOK_SECRET: str = "your_dev_webhook_secret"
+    LOG_LEVEL: str = "INFO"
 
     # Phase 9 Policy Engine Thresholds
     RISK_ALLOW_THRESHOLD: int = 40
