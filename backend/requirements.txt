@@ -12,3 +12,5 @@ python-dotenv==1.0.1
 httpx
 scikit-learn
 joblib
+python-json-logger
+xgboost
