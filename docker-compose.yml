@@ -8,12 +8,12 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///./sql_app.db # Using SQLite for default local setup; can be overridden to postgres
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/aegis
       - MODEL_PATH=ml/models/deployment_risk_model.pkl
       - WEBHOOK_SECRET=your_dev_webhook_secret
       - LOG_LEVEL=INFO
-    volumes:
-      - ./backend/sql_app.db:/app/sql_app.db
+    depends_on:
+      - db
     restart: unless-stopped
 
   frontend:
@@ -28,18 +28,17 @@ services:
       - backend
     restart: unless-stopped
 
-  # Optional local postgres DB can be uncommented for production testing
-  # db:
-  #   image: postgres:15-alpine
-  #   container_name: aegis-db
-  #   environment:
-  #     - POSTGRES_USER=postgres
-  #     - POSTGRES_PASSWORD=postgres
-  #     - POSTGRES_DB=aegis
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
+  db:
+    image: postgres:15-alpine
+    container_name: aegis-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=aegis
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
-# volumes:
-#   postgres_data:
+volumes:
+  postgres_data:
