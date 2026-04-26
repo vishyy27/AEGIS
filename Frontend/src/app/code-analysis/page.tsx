@@ -35,7 +35,7 @@ export default function CodeAnalysis() {
   const startAnalysis = async () => {
     setIsAnalyzing(true);
     try {
-      const resp = await fetch("http://localhost:8000/api/analyze", {
+      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),
