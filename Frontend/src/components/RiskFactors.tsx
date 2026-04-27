@@ -38,7 +38,7 @@ const Factor = ({ label, value, color }: FactorProps) => (
 export default function RiskFactors({ factors = [] }: Props) {
   // ✅ CONVERT BACKEND DATA → UI FORMAT
   const parsedFactors = factors.map((item) => {
-    const value = parseInt(item.impact.replace("%", "").replace("+", ""));
+    const value = parseInt(item.impact?.replace(/[^0-9]/g, "") || "0") || 0;
 
     return {
       label: item.factor,
