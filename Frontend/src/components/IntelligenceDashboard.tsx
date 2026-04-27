@@ -52,21 +52,21 @@ export default function IntelligenceDashboard() {
 
   // Format data for visualizations
   const weightData = [
-    { subject: 'ML Pred', A: metrics.signal_weights_current.ml_failure_probability || 0, fullMark: 1 },
-    { subject: 'Risk Score', A: metrics.signal_weights_current.risk_score || 0, fullMark: 1 },
-    { subject: 'Alerts', A: metrics.signal_weights_current.alert_severity || 0, fullMark: 1 },
-    { subject: 'History', A: metrics.signal_weights_current.historical_failure_rate || 0, fullMark: 1 },
+    { subject: 'ML Pred', A: metrics?.signal_weights_current?.ml_failure_probability ?? 0, fullMark: 1 },
+    { subject: 'Risk Score', A: metrics?.signal_weights_current?.risk_score ?? 0, fullMark: 1 },
+    { subject: 'Alerts', A: metrics?.signal_weights_current?.alert_severity ?? 0, fullMark: 1 },
+    { subject: 'History', A: metrics?.signal_weights_current?.historical_failure_rate ?? 0, fullMark: 1 },
   ];
 
-  const trendData = metrics.confidence.trend_7d.map((val: number, i: number) => ({
+  const trendData = (metrics?.confidence?.trend_7d || []).map((val: number, i: number) => ({
     evaluation: `Eval ${i+1}`,
     confidence: val,
   }));
 
   const anomalyData = [
-    { name: 'Spike', value: metrics.anomaly_summary.spike_count },
-    { name: 'Diverge', value: metrics.anomaly_summary.divergence_count },
-    { name: 'Reversal', value: metrics.anomaly_summary.reversal_count },
+    { name: 'Spike', value: metrics?.anomaly_summary?.spike_count ?? 0 },
+    { name: 'Diverge', value: metrics?.anomaly_summary?.divergence_count ?? 0 },
+    { name: 'Reversal', value: metrics?.anomaly_summary?.reversal_count ?? 0 },
   ];
 
   return (

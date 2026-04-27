@@ -47,16 +47,16 @@ export default function Dashboard() {
 
   // 🔥 Dynamic Risk Level
   const riskLevel =
-    summary?.globalRiskScore > 70
+    (summary?.globalRiskScore ?? 0) > 70
       ? "HIGH RISK"
-      : summary?.globalRiskScore > 40
+      : (summary?.globalRiskScore ?? 0) > 40
         ? "MEDIUM RISK"
         : "LOW RISK";
 
   const riskColor =
-    summary?.globalRiskScore > 70
+    (summary?.globalRiskScore ?? 0) > 70
       ? "#ef4444"
-      : summary?.globalRiskScore > 40
+      : (summary?.globalRiskScore ?? 0) > 40
         ? "#f59e0b"
         : "#06b6d4";
 
@@ -81,7 +81,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard
           title="Global Risk Score"
-          value={`${summary?.globalRiskScore}%`}
+          value={`${summary?.globalRiskScore ?? 0}%`}
           status={riskLevel}
           statusColor={riskColor}
           icon={ShieldCheck}
@@ -90,14 +90,14 @@ export default function Dashboard() {
 
         <StatCard
           title="Active Outages"
-          value={summary?.activeOutages?.toString()}
+          value={(summary?.activeOutages ?? 0).toString()}
           subtitle="All systems nominal"
           icon={AlertCircle}
         />
 
         <StatCard
           title="Success Rate"
-          value={`${summary?.successRate}%`}
+          value={`${summary?.successRate ?? 0}%`}
           subtitle="Last 30 days"
           icon={CheckCircle2}
           trend={{ value: 0.2, isUp: true }}
