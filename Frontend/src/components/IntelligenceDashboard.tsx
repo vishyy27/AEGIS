@@ -78,23 +78,23 @@ export default function IntelligenceDashboard() {
             Adaptive Decision Intelligence
           </h2>
           <p className="text-sm text-slate-400 mt-1">
-            Meta-Learning Layer (v{metrics.policy_version}) • Evaluated {metrics.model_metrics.evaluated_count} deployments
+            Meta-Learning Layer (v{metrics?.policy_version ?? '—'}) • Evaluated {metrics?.model_metrics?.evaluated_count ?? 0} deployments
           </p>
         </div>
         
         <div className="flex gap-4">
           <div className="text-right">
             <div className="text-xs text-slate-500 uppercase tracking-wider">Avg Confidence</div>
-            <div className="text-2xl font-bold text-white">{(metrics.confidence.avg * 100).toFixed(1)}%</div>
+            <div className="text-2xl font-bold text-white">{((metrics?.confidence?.avg ?? 0) * 100).toFixed(1)}%</div>
           </div>
           <div className="text-right">
             <div className="text-xs text-slate-500 uppercase tracking-wider">Drift Risk</div>
             <div className={`text-sm font-bold px-2 py-1 rounded inline-block mt-1 ${
-              metrics.drift_status.drift_risk === 'LOW' ? 'bg-emerald-500/20 text-emerald-400' :
-              metrics.drift_status.drift_risk === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400' :
+              (metrics?.drift_status?.drift_risk ?? 'LOW') === 'LOW' ? 'bg-emerald-500/20 text-emerald-400' :
+              (metrics?.drift_status?.drift_risk) === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400' :
               'bg-red-500/20 text-red-400'
             }`}>
-              {metrics.drift_status.drift_risk}
+              {metrics?.drift_status?.drift_risk ?? 'LOW'}
             </div>
           </div>
         </div>
@@ -147,11 +147,11 @@ export default function IntelligenceDashboard() {
             <div className="flex gap-2">
               <div className="bg-slate-900 rounded p-3 w-1/2 border border-slate-700/50">
                 <div className="text-xs text-slate-500 mb-1">Accuracy</div>
-                <div className="text-lg font-bold text-white">{(metrics.model_metrics.accuracy * 100).toFixed(1)}%</div>
+                <div className="text-lg font-bold text-white">{((metrics?.model_metrics?.accuracy ?? 0) * 100).toFixed(1)}%</div>
               </div>
               <div className="bg-slate-900 rounded p-3 w-1/2 border border-slate-700/50">
                 <div className="text-xs text-slate-500 mb-1">Precision</div>
-                <div className="text-lg font-bold text-white">{(metrics.model_metrics.precision * 100).toFixed(1)}%</div>
+                <div className="text-lg font-bold text-white">{((metrics?.model_metrics?.precision ?? 0) * 100).toFixed(1)}%</div>
               </div>
             </div>
           </div>
@@ -179,7 +179,7 @@ export default function IntelligenceDashboard() {
       
       <div className="mt-4 text-xs text-center justify-center flex items-center text-slate-500 gap-2">
         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-        Updated {new Date(metrics.generated_at).toLocaleTimeString()}
+        Updated {metrics?.generated_at ? new Date(metrics.generated_at).toLocaleTimeString() : '—'}
       </div>
     </div>
   );
