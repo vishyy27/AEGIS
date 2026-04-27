@@ -76,6 +76,7 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
     except Exception as e:
         print(f"Error in /api/dashboard/summary: {e}")
         import traceback
+        traceback.print_exc()
         return {
             "globalRiskScore": 0,
             "successRate": 0,
@@ -84,7 +85,5 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
             "deploymentHealthIndex": 0,
             "serviceStabilityScore": 0,
             "incidentFrequency": 0,
-            "advancedRiskTrends": [],
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "advancedRiskTrends": []
         }
