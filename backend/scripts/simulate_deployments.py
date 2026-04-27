@@ -72,7 +72,11 @@ def run_simulation(args):
                 repo_name=repo,
                 commit_hash=f"sim_{args.scenario}_{i}",
                 author=f"sim_user_{i % 5}",
-                files_changed=["auth/index.js", "db/schema.sql"] if random.random() > 0.5 else ["src/utils.js"],
+                files_changed=random.randint(1, 10),  
+                dependency_updates=random.randint(0, 5),  
+                historical_failures=random.randint(0, 3), 
+                deployment_frequency=random.randint(1, 10),
+                commit_count=random.randint(1, 20),
                 test_coverage=coverage,
                 code_churn=churn,
                 cyclomatic_complexity=complexity,
@@ -84,12 +88,19 @@ def run_simulation(args):
             # Evaluate
             try:
                 result = evaluate_deployment(req, db, bg_tasks)
-                decision = result.policy_decision.decision
+                
+                if result.risk_level == "LOW":
+                    decision = "ALLOW"
+                elif result.risk_level == "MEDIUM":
+                    decision = "WARN"
+                else:
+                    decision = "BLOCK"
+                    
                 stats[decision] += 1
                 
                 print(f"Decision: {decision}")
-                print(f"Risk Score: {result.risk_analysis.risk_score}")
-                print(f"Confidence: {result.policy_decision.confidence_score}")
+                print(f"Risk Score: {result.risk_score}")
+                print(f"Risk Level: {result.risk_level}")
                 
                 # Feedback loop failure injection
                 is_failure = random.random() < args.inject_failure_rate
@@ -101,7 +112,9 @@ def run_simulation(args):
                 # Find the deployment ID just created
                 dep = db.query(Deployment).order_by(Deployment.id.desc()).first()
                 if dep:
-                    register_deployment_outcome(dep.id, is_failure, db)
+                    outcome = "failure" if is_failure else "success"
+                    register_deployment_outcome(db, dep.id, outcome)
+                    db.commit()
                     print(f"Registered feedback.")
                     
             except Exception as e:
