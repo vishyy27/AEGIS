@@ -6,6 +6,7 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "sqlite:///./aegis.db"
     REDIS_URL: str = "redis://localhost:6379/0"
+    SECRET_KEY: str = "supersecretkey-change-in-production"
     JWT_SECRET: str = "supersecretkey-change-in-production"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
