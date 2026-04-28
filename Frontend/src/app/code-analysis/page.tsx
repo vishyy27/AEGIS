@@ -49,15 +49,15 @@ export default function CodeAnalysis() {
           breakdown: [
             {
               label: "Complexity",
-              val: Math.round(data.breakdown.complexity_weight),
+              val: Math.round(data?.breakdown?.complexity_weight ?? 0),
             },
             {
               label: "Files Changed",
-              val: Math.round(data.breakdown.files_changed_weight),
+              val: Math.round(data?.breakdown?.files_changed_weight ?? 0),
             },
             {
               label: "Coverage Penalty",
-              val: Math.round(data.breakdown.test_coverage_penalty),
+              val: Math.round(data?.breakdown?.test_coverage_penalty ?? 0),
             },
           ],
         });
