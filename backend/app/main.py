@@ -81,7 +81,14 @@ async def log_requests(request: Request, call_next):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error("Unhandled Exception", extra={"url": str(request.url), "error": str(exc)}, exc_info=True)
-    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+    return JSONResponse(
+        status_code=500, 
+        content={
+            "detail": "Internal Server Error",
+            "fallback_message": "The system encountered an unexpected condition. Please try again.",
+            "error_type": type(exc).__name__
+        }
+    )
 
 
 
@@ -94,12 +101,24 @@ def root():
 # Health check
 @app.get("/health")
 def read_health():
-    # A real implementation would verify DB and ML model status dynamically.
+    from .database import engine
+    from sqlalchemy import text
+    from .services.ml_engine import ml_engine
+
+    db_status = "disconnected"
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+            db_status = "connected"
+    except Exception as e:
+        logger.error(f"Health check DB error: {str(e)}")
+
     return {
-        "status": "healthy",
+        "status": "healthy" if db_status == "connected" else "degraded",
         "api": "up",
-        "database": "connected",
-        "ml_model": "loaded",
+        "database": db_status,
+        "ml_model": "loaded" if ml_engine.model else "not_loaded",
+        "ml_model_version": ml_engine.current_version,
         "version": "1.0.0",
     }
 
