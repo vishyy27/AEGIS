@@ -2,73 +2,41 @@
 
 import React from "react";
 
-// ✅ ADD THIS TYPE
-type BackendFactor = {
-  factor: string;
-  impact: string;
-};
-
-// ✅ ADD PROPS
 interface Props {
-  factors: BackendFactor[];
+  factors: { factor: string; impact: string }[];
 }
 
-interface FactorProps {
-  label: string;
-  value: number;
-  color: string;
-}
-
-const Factor = ({ label, value, color }: FactorProps) => (
-  <div className="space-y-2">
-    <div className="flex justify-between text-xs font-medium">
-      <span className="text-slate-400 uppercase tracking-tighter">{label}</span>
-      <span className="text-white">{value}%</span>
-    </div>
-    <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-      <div
-        className="h-full rounded-full transition-all duration-1000"
-        style={{ width: `${value}%`, backgroundColor: color }}
-      />
-    </div>
-  </div>
-);
-
-// ✅ MODIFY FUNCTION SIGNATURE ONLY
 export default function RiskFactors({ factors = [] }: Props) {
-  // ✅ CONVERT BACKEND DATA → UI FORMAT
-  const parsedFactors = factors.map((item) => {
+  const parsed = factors.map(item => {
     const value = parseInt(item.impact?.replace(/[^0-9]/g, "") || "0") || 0;
-
     return {
       label: item.factor,
       value,
-      color: value > 70 ? "#ef4444" : value > 40 ? "#f59e0b" : "#06b6d4",
+      color: value > 70 ? "#ef4444" : value > 40 ? "#eab308" : "#3b82f6",
     };
   });
 
   return (
-    <div className="aegis-card h-full flex flex-col justify-center">
-      <h3 className="text-sm font-semibold text-slate-300 mb-6 flex items-center gap-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
-        AI RISK FACTORS
-      </h3>
+    <div className="aegis-card h-full flex flex-col">
+      <h3 className="section-title mb-4">Risk Factors</h3>
 
-      <div className="space-y-5">
-        {/* ✅ USE DYNAMIC DATA */}
-        {parsedFactors.length > 0 ? (
-          parsedFactors.map((f, index) => (
-            <Factor
-              key={index}
-              label={f.label}
-              value={f.value}
-              color={f.color}
-            />
-          ))
-        ) : (
-          <p className="text-slate-400 text-sm">No data available</p>
-        )}
-      </div>
+      {parsed.length > 0 ? (
+        <div className="space-y-3">
+          {parsed.map((f, i) => (
+            <div key={i}>
+              <div className="flex justify-between text-[11px] mb-1">
+                <span className="text-[#8892a8]">{f.label}</span>
+                <span className="text-[#c8cdd8] mono">{f.value}%</span>
+              </div>
+              <div className="h-1 w-full bg-[#1c2333] rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${f.value}%`, backgroundColor: f.color }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[12px] text-[#3d4454]">No data available</p>
+      )}
     </div>
   );
 }
