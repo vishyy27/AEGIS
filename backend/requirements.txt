@@ -14,3 +14,4 @@ scikit-learn
 joblib
 python-json-logger
 xgboost
+websockets
