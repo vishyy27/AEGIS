@@ -2,41 +2,19 @@
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Shield, Check, X, AlertTriangle, ChevronRight } from "lucide-react";
+import { Check, X, AlertTriangle } from "lucide-react";
 import { fetchAPI } from "@/lib/api";
 
 interface WaterfallStage {
-  stage: number;
-  name: string;
-  input: Record<string, unknown>;
-  result: string;
-  decision_after: string;
-  description: string;
+  stage: number; name: string; result: string; decision_after: string; description: string;
 }
 
-const resultColors: Record<string, string> = {
-  PASS: "text-emerald-400",
-  BLOCK: "text-red-400",
-  WARN: "text-amber-400",
-  ESCALATE: "text-orange-400",
-  LOW_CONFIDENCE: "text-violet-400",
-  HIGH_CONFIDENCE: "text-emerald-400",
-  ALLOW: "text-emerald-400",
-};
-
-const resultBgs: Record<string, string> = {
-  PASS: "bg-emerald-500/10",
-  BLOCK: "bg-red-500/10",
-  WARN: "bg-amber-500/10",
-  ESCALATE: "bg-orange-500/10",
-  ALLOW: "bg-emerald-500/10",
-};
-
-const resultIcons: Record<string, React.ReactNode> = {
-  PASS: <Check size={14} />,
-  BLOCK: <X size={14} />,
-  WARN: <AlertTriangle size={14} />,
-  ALLOW: <Check size={14} />,
+const resultStyle: Record<string, { color: string; icon: React.ReactNode }> = {
+  PASS: { color: "text-emerald-400", icon: <Check size={12} /> },
+  BLOCK: { color: "text-rose-400", icon: <X size={12} /> },
+  WARN: { color: "text-amber-400", icon: <AlertTriangle size={12} /> },
+  ESCALATE: { color: "text-orange-400", icon: <AlertTriangle size={12} /> },
+  ALLOW: { color: "text-emerald-400", icon: <Check size={12} /> },
 };
 
 export default function PolicyWaterfall({ deploymentId }: { deploymentId: number }) {
@@ -50,56 +28,25 @@ export default function PolicyWaterfall({ deploymentId }: { deploymentId: number
       .finally(() => setLoading(false));
   }, [deploymentId]);
 
-  if (loading) {
-    return (
-      <div className="aegis-card animate-pulse">
-        <div className="h-6 w-48 bg-slate-800 rounded mb-4" />
-        <div className="space-y-3">
-          {[1,2,3,4,5].map(i => <div key={i} className="h-16 bg-slate-800/50 rounded-lg" />)}
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="aegis-card"><div className="space-y-2">{[1,2,3,4].map(i => <div key={i} className="h-12 bg-[#151a2e] rounded-md animate-pulse" />)}</div></div>;
 
   return (
     <div className="aegis-card">
-      <div className="flex items-center gap-2 mb-6">
-        <Shield size={18} className="text-cyan-400" />
-        <h3 className="section-title">Policy Waterfall</h3>
-      </div>
-
+      <h3 className="section-title mb-3">Policy Waterfall</h3>
       <div className="space-y-1">
-        {stages.map((stage, i) => {
-          const color = resultColors[stage.result] || "text-slate-400";
-          const bg = resultBgs[stage.result] || "bg-slate-800/30";
-          const icon = resultIcons[stage.result] || <ChevronRight size={14} />;
-
+        {stages.map((s, i) => {
+          const cfg = resultStyle[s.result] || { color: "text-[#6b7280]", icon: null };
           return (
-            <motion.div
-              key={stage.stage}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08 }}
-            >
-              <div className={`${bg} rounded-lg px-4 py-3 border border-transparent hover:border-slate-700 transition-colors`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400 mono">
-                      {stage.stage}
-                    </span>
-                    <span className="text-sm font-medium text-slate-200">{stage.name}</span>
-                  </div>
-                  <div className={`flex items-center gap-1.5 ${color} text-xs font-semibold`}>
-                    {icon}
-                    <span>{stage.result}</span>
-                  </div>
-                </div>
-                <p className="text-xs text-slate-500 mt-1.5 ml-9">{stage.description}</p>
-                {i < stages.length - 1 && (
-                  <div className="flex justify-center mt-2">
-                    <div className="w-px h-3 bg-slate-700" />
-                  </div>
-                )}
+            <motion.div key={s.stage} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-md bg-[#0a0e1a] border border-[#1c2333] hover:border-[#232b3e] transition-colors">
+              <span className="text-[10px] font-semibold text-[#3d4454] mono w-4 shrink-0">{s.stage}</span>
+              <div className="flex-1 min-w-0">
+                <span className="text-[12px] text-[#c8cdd8]">{s.name}</span>
+                <p className="text-[10px] text-[#4a5468] truncate">{s.description}</p>
+              </div>
+              <div className={`flex items-center gap-1 ${cfg.color} text-[11px] font-medium shrink-0`}>
+                {cfg.icon}
+                {s.result}
               </div>
             </motion.div>
           );
