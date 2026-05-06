@@ -2,25 +2,26 @@
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertOctagon, Clock, CheckCircle, AlertTriangle } from "lucide-react";
+import { CheckCircle, Clock } from "lucide-react";
 import { fetchAPI } from "@/lib/api";
 
 interface Incident {
-  incident_id: string;
-  title: string;
-  severity: string;
-  status: string;
-  deployment_ids: number[];
-  alert_ids: number[];
-  created_at: string | null;
-  resolved_at: string | null;
+  incident_id: string; title: string; severity: string; status: string;
+  deployment_ids: number[]; alert_ids: number[];
+  created_at: string | null; resolved_at: string | null;
 }
 
-const severityConfig: Record<string, { color: string; bg: string; icon: React.ReactNode }> = {
-  CRITICAL: { color: "text-red-400", bg: "bg-red-500/10 border-red-500/20", icon: <AlertOctagon size={16} /> },
-  HIGH: { color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20", icon: <AlertTriangle size={16} /> },
-  MEDIUM: { color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20", icon: <AlertTriangle size={16} /> },
-  LOW: { color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20", icon: <CheckCircle size={16} /> },
+const severityColors: Record<string, string> = {
+  CRITICAL: "text-rose-400 bg-rose-500/8 border-rose-500/15",
+  HIGH: "text-amber-400 bg-amber-500/8 border-amber-500/15",
+  MEDIUM: "text-yellow-400 bg-yellow-500/8 border-yellow-500/15",
+  LOW: "text-emerald-400 bg-emerald-500/8 border-emerald-500/15",
+};
+
+const statusColors: Record<string, string> = {
+  resolved: "text-emerald-400",
+  active: "text-rose-400",
+  investigating: "text-amber-400",
 };
 
 export default function IncidentGraph() {
@@ -28,71 +29,52 @@ export default function IncidentGraph() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAPI<Incident[]>("/api/incidents/list?limit=10")
+    fetchAPI<Incident[]>("/api/incidents/list?limit=15")
       .then(setIncidents)
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
-    return <div className="aegis-card animate-pulse"><div className="h-64 bg-slate-800/50 rounded-lg" /></div>;
+    return <div className="aegis-card"><div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 bg-[#151a2e] rounded-md animate-pulse" />)}</div></div>;
   }
 
   return (
     <div className="aegis-card">
-      <div className="flex items-center gap-2 mb-6">
-        <AlertOctagon size={18} className="text-red-400" />
-        <h3 className="section-title">Incident Timeline</h3>
-      </div>
+      <h3 className="section-title mb-4">Incidents</h3>
 
       {incidents.length === 0 ? (
-        <div className="text-center py-10">
-          <CheckCircle size={32} className="text-emerald-500/30 mx-auto mb-3" />
-          <p className="text-sm text-slate-500">No incidents detected</p>
-          <p className="text-xs text-slate-600 mt-1">System operating normally</p>
+        <div className="text-center py-12">
+          <CheckCircle size={20} className="text-emerald-500/30 mx-auto mb-2" />
+          <p className="text-[13px] text-[#4a5468]">No incidents detected</p>
+          <p className="text-[11px] text-[#2a3040] mt-0.5">System operating normally</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {incidents.map((inc, i) => {
-            const cfg = severityConfig[inc.severity] || severityConfig.LOW;
-            return (
-              <motion.div
-                key={inc.incident_id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className={`${cfg.bg} border rounded-lg px-4 py-3`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 ${cfg.color}`}>{cfg.icon}</div>
-                    <div>
-                      <h4 className="text-sm font-medium text-slate-200">{inc.title}</h4>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className={`text-[10px] font-bold ${cfg.color}`}>{inc.severity}</span>
-                        <span className="text-[10px] text-slate-500 mono">{inc.incident_id}</span>
-                        <span className="text-[10px] text-slate-600 flex items-center gap-1">
-                          <Clock size={10} />
-                          {inc.created_at ? new Date(inc.created_at).toLocaleString() : ""}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                    inc.status === "resolved" ? "bg-emerald-500/10 text-emerald-400" :
-                    inc.status === "active" ? "bg-red-500/10 text-red-400" :
-                    "bg-amber-500/10 text-amber-400"
-                  }`}>
-                    {inc.status}
+        <div className="space-y-2">
+          {incidents.map((inc, i) => (
+            <motion.div key={inc.incident_id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
+              className="flex items-center justify-between px-3.5 py-3 rounded-md bg-[#0a0e1a] border border-[#1c2333] hover:border-[#232b3e] transition-colors">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[13px] font-medium text-[#c8cdd8] truncate">{inc.title}</span>
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${severityColors[inc.severity] || severityColors.LOW}`}>
+                    {inc.severity}
                   </span>
                 </div>
-                <div className="flex gap-4 mt-2 ml-7">
-                  <span className="text-[10px] text-slate-500">{inc.deployment_ids?.length || 0} deployments</span>
-                  <span className="text-[10px] text-slate-500">{inc.alert_ids?.length || 0} alerts</span>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-[10px] text-[#3d4454] mono">{inc.incident_id}</span>
+                  <span className="text-[10px] text-[#3d4454] flex items-center gap-1">
+                    <Clock size={9} />
+                    {inc.created_at ? new Date(inc.created_at).toLocaleDateString() : ""}
+                  </span>
+                  <span className="text-[10px] text-[#3d4454]">{inc.deployment_ids?.length || 0} deploys · {inc.alert_ids?.length || 0} alerts</span>
                 </div>
-              </motion.div>
-            );
-          })}
+              </div>
+              <span className={`text-[10px] font-medium ${statusColors[inc.status] || "text-[#4a5468]"}`}>
+                {inc.status}
+              </span>
+            </motion.div>
+          ))}
         </div>
       )}
     </div>
