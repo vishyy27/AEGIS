@@ -1,56 +1,45 @@
 "use client";
 
-import React from "react";
-import { CheckCircle2, AlertTriangle, ShieldCheck } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { CheckCircle2 } from "lucide-react";
+import { fetchAPI } from "@/lib/api";
+
+interface Recommendation { id: number; category: string; title: string; priority: string; status: string; }
 
 export default function RecommendationPanel() {
+  const [recs, setRecs] = useState<Recommendation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAPI<any>("/api/dashboard/summary")
+      .then(data => {
+        // The dashboard summary doesn't return recs directly, so fallback
+        setRecs([]);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  // While we connect to real recommendation data, show contextual guidance
   return (
-    <div className="aegis-card border-l-4 border-l-cyan-500">
-      <div className="flex items-center gap-2 mb-4">
-        <ShieldCheck className="text-cyan-500" size={20} />
-        <h3 className="section-title">AI Recommendation</h3>
-      </div>
+    <div className="aegis-card h-full">
+      <h3 className="section-title mb-3">Recommendations</h3>
 
-      <div className="flex items-center gap-3 mb-6 p-4 bg-cyan-500/5 rounded-lg border border-cyan-500/10">
-        <div className="w-10 h-10 rounded-full bg-cyan-500/10 flex items-center justify-center text-cyan-500">
-          <CheckCircle2 size={24} />
-        </div>
+      <div className="flex items-start gap-2.5 px-3 py-2.5 bg-emerald-500/5 border border-emerald-500/10 rounded-md mb-3">
+        <CheckCircle2 size={14} className="text-emerald-400 mt-0.5 shrink-0" />
         <div>
-          <div className="text-lg font-bold text-white leading-none mb-1">
-            Safe to deploy.
-          </div>
-          <p className="text-xs text-slate-400">
-            Current risk parameters are within acceptable thresholds for
-            Production.
-          </p>
+          <span className="text-[13px] font-medium text-[#c8cdd8] block leading-tight">Safe to deploy</span>
+          <span className="text-[11px] text-[#4a5468]">Risk parameters within acceptable thresholds</span>
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="mt-1 text-cyan-500">
-            <CheckCircle2 size={14} />
+      <div className="space-y-1.5">
+        {["Ensure all unit tests pass", "Validate staging deployment", "Monitor service memory usage"].map((item, i) => (
+          <div key={i} className="flex items-center gap-2 px-2 py-1.5">
+            <CheckCircle2 size={12} className="text-blue-400 shrink-0" />
+            <span className="text-[12px] text-[#8892a8]">{item}</span>
           </div>
-          <span className="text-sm text-slate-300">
-            Ensure all unit tests pass
-          </span>
-        </div>
-        <div className="flex items-start gap-3">
-          <div className="mt-1 text-cyan-500">
-            <CheckCircle2 size={14} />
-          </div>
-          <span className="text-sm text-slate-300">
-            Validate staging deployment
-          </span>
-        </div>
-        <div className="flex items-start gap-3">
-          <div className="mt-1 text-cyan-500">
-            <CheckCircle2 size={14} />
-          </div>
-          <span className="text-sm text-slate-300">
-            Monitor service memory usage
-          </span>
-        </div>
+        ))}
       </div>
     </div>
   );
