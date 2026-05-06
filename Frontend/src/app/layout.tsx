@@ -2,29 +2,34 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
+import AICommandBar from "@/components/AICommandBar";
 
 export const metadata: Metadata = {
-  title: "AEGIS | AI Deployment Risk Platform",
-  description: "Predict deployment risk before production releases.",
+  title: "AEGIS — Deployment Intelligence",
+  description: "AI-native deployment risk prediction and operational intelligence platform.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className="dark">
-      <body className="bg-[#020617] text-white overflow-hidden">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+      </head>
+      <body className="overflow-hidden">
         <div className="flex">
           <Sidebar />
-          <div className="flex-1 ml-[240px] h-screen overflow-y-auto">
+          <div className="flex-1 ml-[220px] h-screen overflow-y-auto">
             <Header />
-            <main className="mt-16 p-8 min-h-screen">
-              <div className="max-w-[1600px] mx-auto space-y-8">{children}</div>
+            <main className="mt-14 px-6 py-6">
+              <div className="max-w-[1400px] mx-auto">{children}</div>
             </main>
           </div>
         </div>
+        <AICommandBar />
       </body>
     </html>
   );
