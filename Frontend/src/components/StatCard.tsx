@@ -1,79 +1,42 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
 import { LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface StatCardProps {
   title: string;
   value: string | number;
   subtitle?: string;
   icon?: LucideIcon;
-  trend?: {
-    value: number;
-    isUp: boolean;
-  };
+  trend?: { value: number; isUp: boolean };
   status?: string;
   statusColor?: string;
 }
 
-export default function StatCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-  trend,
-  status,
-  statusColor,
-}: StatCardProps) {
+export default function StatCard({ title, value, subtitle, icon: Icon, trend, status, statusColor }: StatCardProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="aegis-card group hover:border-slate-700 transition-colors"
-    >
-      <div className="flex justify-between items-start mb-4">
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-          {title}
-        </span>
-        {Icon && (
-          <Icon
-            size={18}
-            className="text-slate-500 group-hover:text-cyan-500 transition-colors"
-          />
-        )}
+    <div className="aegis-card">
+      <div className="flex items-center justify-between mb-3">
+        <span className="label">{title}</span>
+        {Icon && <Icon size={15} className="text-[#3d4454]" />}
       </div>
 
-      <div className="flex items-baseline gap-3 mb-1">
-        <h2 className="text-4xl font-bold text-white tracking-tight">
-          {value}
-        </h2>
+      <div className="flex items-baseline gap-2">
+        <span className="text-2xl font-semibold text-white tracking-tight mono">{value}</span>
         {trend && (
-          <span
-            className={cn(
-              "text-xs font-bold",
-              trend.isUp ? "text-emerald-500" : "text-rose-500",
-            )}
-          >
+          <span className={`text-[11px] font-medium ${trend.isUp ? "text-emerald-400" : "text-rose-400"}`}>
             {trend.isUp ? "↑" : "↓"} {Math.abs(trend.value)}%
           </span>
         )}
       </div>
 
       {status && (
-        <div
-          className="text-[10px] font-bold px-2 py-0.5 rounded inline-block mb-1 tracking-wider uppercase"
-          style={{
-            backgroundColor: `${statusColor}22` || "rgba(59, 130, 246, 0.1)",
-            color: statusColor || "var(--primary)",
-          }}
-        >
+        <span className="inline-block mt-2 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
+          style={{ backgroundColor: `${statusColor}15`, color: statusColor }}>
           {status}
-        </div>
+        </span>
       )}
-
-      {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
-    </motion.div>
+      {subtitle && <p className="text-[12px] text-[#4a5468] mt-1">{subtitle}</p>}
+    </div>
   );
 }
