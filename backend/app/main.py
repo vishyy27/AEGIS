@@ -149,3 +149,21 @@ app.include_router(insights_router)
 app.include_router(incidents_router)
 app.include_router(ml_router)
 app.include_router(metrics_router)
+
+# Phase 11: AI-Native Real-Time DevOps Platform
+from .routers.websocket import router as websocket_router
+from .routers.xai import router as xai_router
+from .routers.phase11_routes import (
+    replay_router, simulation_router, assistant_router,
+    fleet_router, incident_router as phase11_incident_router, audit_router,
+)
+
+app.include_router(websocket_router)
+app.include_router(xai_router)
+app.include_router(replay_router)
+app.include_router(simulation_router)
+app.include_router(assistant_router)
+app.include_router(fleet_router)
+app.include_router(phase11_incident_router)
+app.include_router(audit_router)
+
