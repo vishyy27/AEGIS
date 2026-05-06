@@ -1,20 +1,111 @@
 @import "tailwindcss";
 
-/* AEGIS Theme */
-
+/* ─── Design Tokens ─── */
 :root {
-  --background: #020617;
-  --card: #0f172a;
-  --border: #1e293b;
-  --primary: #06b6d4;
+  --bg-root: #0a0e1a;
+  --bg-surface: #0f1422;
+  --bg-elevated: #151a2e;
+  --bg-hover: #1a2038;
+  --border-subtle: #1c2333;
+  --border-default: #232b3e;
+  --text-primary: #e2e8f0;
+  --text-secondary: #8892a8;
+  --text-tertiary: #4a5468;
+  --accent: #3b82f6;
+  --accent-muted: rgba(59, 130, 246, 0.12);
+  --success: #22c55e;
+  --warning: #eab308;
+  --danger: #ef4444;
+  --info: #06b6d4;
 }
+
+* { box-sizing: border-box; }
 
 body {
-  background: var(--background);
-  color: white;
-  font-family: "Inter", sans-serif;
+  background: var(--bg-root);
+  color: var(--text-primary);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
 }
 
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+/* ─── Card System ─── */
 .aegis-card {
-  @apply bg-[#0f172a] border border-[#1e293b] rounded-xl p-6;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 20px;
+  transition: border-color 0.2s ease;
 }
+.aegis-card:hover {
+  border-color: var(--border-default);
+}
+
+/* ─── Glass overlay ─── */
+.glass-card {
+  background: rgba(15, 20, 34, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+/* ─── Subtle pulse ─── */
+@keyframes live-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.animate-live-dot { animation: live-dot 2s ease-in-out infinite; }
+
+/* ─── Typography ─── */
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+}
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.text-muted {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+.mono {
+  font-family: "JetBrains Mono", monospace;
+}
+.label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ─── Status Dots ─── */
+.status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.status-dot-healthy { background: var(--success); }
+.status-dot-warning { background: var(--warning); }
+.status-dot-critical { background: var(--danger); }
+
+/* ─── Focus Ring ─── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ─── Table ─── */
+table { border-collapse: collapse; }
+th { font-size: 11px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; }
+td { font-size: 13px; color: var(--text-secondary); }
