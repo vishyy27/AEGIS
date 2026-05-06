@@ -2,120 +2,101 @@
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Clock, Play, Pause, SkipBack, SkipForward, AlertTriangle, Zap, Activity } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Zap, AlertTriangle, Activity } from "lucide-react";
 import { fetchAPI } from "@/lib/api";
 
 interface TimelineItem {
-  type: string;
-  timestamp: string;
-  relative_seconds: number;
+  type: string; timestamp: string; relative_seconds: number;
   data: Record<string, unknown>;
 }
 
 interface ReplayData {
-  deployment_id: number;
-  service: string;
-  risk_score: number;
-  decision: string;
-  timeline: TimelineItem[];
-  started_at: string;
+  deployment_id: number; service: string; risk_score: number;
+  decision: string; outcome: string; timeline: TimelineItem[];
 }
 
-const typeIcons: Record<string, React.ReactNode> = {
-  event: <Zap size={12} className="text-cyan-400" />,
-  alert: <AlertTriangle size={12} className="text-amber-400" />,
-  anomaly: <Activity size={12} className="text-red-400" />,
+const typeConfig: Record<string, { icon: React.ReactNode; color: string }> = {
+  event: { icon: <Zap size={11} />, color: "text-blue-400" },
+  alert: { icon: <AlertTriangle size={11} />, color: "text-amber-400" },
+  anomaly: { icon: <Activity size={11} />, color: "text-rose-400" },
 };
 
 export default function ReplayTimeline({ deploymentId }: { deploymentId: number }) {
   const [data, setData] = useState<ReplayData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
     fetchAPI<ReplayData>(`/api/replay/timeline/${deploymentId}`)
-      .then(setData)
+      .then(d => { setData(d); setIdx(0); setPlaying(false); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [deploymentId]);
 
   useEffect(() => {
     if (!playing || !data) return;
-    const interval = setInterval(() => {
-      setCurrentIndex(prev => {
-        if (prev >= data.timeline.length - 1) {
-          setPlaying(false);
-          return prev;
-        }
+    const t = setInterval(() => {
+      setIdx(prev => {
+        if (prev >= data.timeline.length - 1) { setPlaying(false); return prev; }
         return prev + 1;
       });
-    }, 800);
-    return () => clearInterval(interval);
+    }, 600);
+    return () => clearInterval(t);
   }, [playing, data]);
 
-  if (loading) return <div className="aegis-card animate-pulse"><div className="h-64 bg-slate-800/50 rounded-lg" /></div>;
-  if (!data) return <div className="aegis-card"><p className="text-sm text-slate-500 text-center py-10">No replay data available</p></div>;
+  if (loading) return <div className="aegis-card"><div className="h-48 bg-[#151a2e] rounded-md animate-pulse" /></div>;
+  if (!data) return <div className="aegis-card"><p className="text-[12px] text-[#3d4454] text-center py-12">No replay data</p></div>;
 
-  const progress = data.timeline.length > 0 ? ((currentIndex + 1) / data.timeline.length) * 100 : 0;
+  const progress = data.timeline.length > 0 ? ((idx + 1) / data.timeline.length) * 100 : 0;
 
   return (
-    <div className="aegis-card">
-      <div className="flex items-center justify-between mb-4">
+    <div className="aegis-card flex flex-col h-full">
+      {/* Meta */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="section-title">Timeline</h3>
         <div className="flex items-center gap-2">
-          <Clock size={18} className="text-violet-400" />
-          <h3 className="section-title">Deployment Replay</h3>
+          <span className="text-[11px] text-[#4a5468] mono">#{data.deployment_id}</span>
+          <span className="text-[11px] text-[#6b7280]">{data.service}</span>
         </div>
-        <span className="text-xs text-slate-500 mono">#{data.deployment_id} · {data.service}</span>
       </div>
 
-      {/* Playback controls */}
-      <div className="flex items-center gap-3 mb-4 bg-slate-900/50 rounded-lg p-3">
-        <button onClick={() => setCurrentIndex(0)} className="p-1.5 hover:bg-slate-700 rounded transition-colors">
-          <SkipBack size={14} className="text-slate-400" />
+      {/* Controls */}
+      <div className="flex items-center gap-2 mb-3 bg-[#0a0e1a] rounded-md p-2 border border-[#1c2333]">
+        <button onClick={() => setIdx(0)} className="p-1 hover:bg-white/[0.05] rounded transition-colors">
+          <SkipBack size={13} className="text-[#6b7280]" />
         </button>
-        <button onClick={() => setPlaying(!playing)} className="p-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg transition-colors">
-          {playing ? <Pause size={16} className="text-white" /> : <Play size={16} className="text-white" />}
+        <button onClick={() => setPlaying(!playing)} className="p-1.5 bg-blue-600 hover:bg-blue-500 rounded-md transition-colors">
+          {playing ? <Pause size={13} className="text-white" /> : <Play size={13} className="text-white" />}
         </button>
-        <button onClick={() => setCurrentIndex(Math.min(currentIndex + 1, data.timeline.length - 1))} className="p-1.5 hover:bg-slate-700 rounded transition-colors">
-          <SkipForward size={14} className="text-slate-400" />
+        <button onClick={() => setIdx(Math.min(idx + 1, data.timeline.length - 1))} className="p-1 hover:bg-white/[0.05] rounded transition-colors">
+          <SkipForward size={13} className="text-[#6b7280]" />
         </button>
 
-        {/* Progress bar */}
-        <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-          <motion.div className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 rounded-full" animate={{ width: `${progress}%` }} />
+        <div className="flex-1 h-1 bg-[#1c2333] rounded-full overflow-hidden mx-2">
+          <motion.div className="h-full bg-blue-500 rounded-full" animate={{ width: `${progress}%` }} transition={{ duration: 0.15 }} />
         </div>
-        <span className="text-[10px] text-slate-500 mono">{currentIndex + 1}/{data.timeline.length}</span>
+        <span className="text-[10px] text-[#4a5468] mono shrink-0">{idx + 1}/{data.timeline.length}</span>
       </div>
 
-      {/* Timeline events */}
-      <div className="space-y-1 max-h-[300px] overflow-y-auto pr-1">
+      {/* Events */}
+      <div className="space-y-0.5 flex-1 overflow-y-auto">
         {data.timeline.map((item, i) => {
-          const isActive = i === currentIndex;
-          const isPast = i < currentIndex;
+          const isActive = i === idx;
+          const isPast = i < idx;
+          const cfg = typeConfig[item.type] || typeConfig.event;
+          const eventLabel = (item.data?.event_type as string) || (item.data?.alert_type as string) || item.type;
+
           return (
-            <motion.div
-              key={i}
-              onClick={() => setCurrentIndex(i)}
-              className={`flex items-start gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all ${
-                isActive ? "bg-cyan-500/10 border border-cyan-500/20" :
-                isPast ? "opacity-50" : "opacity-30 hover:opacity-60"
-              }`}
-              animate={{ opacity: isActive ? 1 : isPast ? 0.5 : 0.3 }}
-            >
-              <div className="mt-0.5">{typeIcons[item.type] || <Zap size={12} className="text-slate-500" />}</div>
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-medium text-slate-300 truncate">
-                    {(item.data?.event_type as string) || (item.data?.alert_type as string) || (item.data?.anomaly_type as string) || item.type}
-                  </span>
-                  <span className="text-[10px] text-slate-600 mono shrink-0 ml-2">+{item.relative_seconds?.toFixed(1)}s</span>
-                </div>
-                <p className="text-[10px] text-slate-500 truncate">
-                  {(item.data?.message as string) || (item.data?.description as string) || ""}
-                </p>
-              </div>
-            </motion.div>
+            <div key={i} onClick={() => setIdx(i)}
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer transition-all text-[12px] ${
+                isActive ? "bg-blue-500/8 border border-blue-500/15" :
+                isPast ? "opacity-40" : "opacity-25 hover:opacity-40"
+              }`}>
+              <span className={cfg.color}>{cfg.icon}</span>
+              <span className={`flex-1 truncate ${isActive ? "text-[#c8cdd8]" : "text-[#6b7280]"}`}>{eventLabel}</span>
+              <span className="text-[9px] text-[#3d4454] mono shrink-0">+{item.relative_seconds?.toFixed(1)}s</span>
+            </div>
           );
         })}
       </div>
