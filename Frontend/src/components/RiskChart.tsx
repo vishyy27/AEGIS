@@ -2,86 +2,42 @@
 
 import React from "react";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Cell,
 } from "recharts";
 
-// ✅ Props type
-type Props = {
-  data: number[];
-};
+type Props = { data: number[] };
 
-// 🎨 Color logic
-const getBarColor = (value: number) => {
-  if (value > 70) return "#ef4444"; // Red
-  if (value > 30) return "#f59e0b"; // Orange
-  return "#06b6d4"; // Cyan
-};
+const barColor = (v: number) => v > 70 ? "#ef4444" : v > 40 ? "#eab308" : "#3b82f6";
 
 export default function RiskChart({ data }: Props) {
-  // ✅ Convert backend array → chart format
-  const chartData = (data || []).map((value, index) => ({
-    time: `${index * 2}:00`, // simple time labels
+  const chartData = (data || []).map((value, i) => ({
+    time: `${i * 2}:00`,
     risk: value,
   }));
 
   return (
-    <div className="aegis-card h-[280px] flex flex-col">
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-medium text-slate-200">
-          24-Hour Risk Trend
-        </h3>
-        <span className="text-xs text-slate-500 font-medium bg-slate-800/50 px-2 py-1 rounded">
-          Last update: 5m ago
+    <div className="aegis-card h-[260px] flex flex-col">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="section-title">24h Risk Trend</h3>
+        <span className="text-[10px] text-[#3d4454]">
+          {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </span>
       </div>
 
       <div className="flex-1 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={chartData}
-            margin={{ top: 0, right: 0, left: -25, bottom: 0 }}
-          >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              vertical={false}
-              stroke="#1e293b"
-            />
-
-            <XAxis
-              dataKey="time"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: "#475569", fontSize: 10 }}
-              dy={10}
-            />
-
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: "#475569", fontSize: 10 }}
-            />
-
+          <BarChart data={chartData} margin={{ top: 0, right: 0, left: -30, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1c2333" />
+            <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: "#3d4454", fontSize: 10 }} dy={8} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fill: "#3d4454", fontSize: 10 }} />
             <Tooltip
-              cursor={{ fill: "#1e293b", opacity: 0.4 }}
-              contentStyle={{
-                backgroundColor: "#0f172a",
-                border: "1px solid #1e293b",
-                borderRadius: "8px",
-                fontSize: "12px",
-                color: "#fff",
-              }}
+              cursor={{ fill: "#151a2e", opacity: 0.5 }}
+              contentStyle={{ backgroundColor: "#0f1422", border: "1px solid #1c2333", borderRadius: "6px", fontSize: "11px", color: "#c8cdd8" }}
             />
-
-            <Bar dataKey="risk" radius={[4, 4, 0, 0]}>
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={getBarColor(entry.risk)} />
+            <Bar dataKey="risk" radius={[3, 3, 0, 0]}>
+              {chartData.map((entry, i) => (
+                <Cell key={`c-${i}`} fill={barColor(entry.risk)} />
               ))}
             </Bar>
           </BarChart>
