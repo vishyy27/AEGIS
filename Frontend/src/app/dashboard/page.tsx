@@ -9,6 +9,8 @@ import RiskFactors from "@/components/RiskFactors";
 import RecommendationPanel from "@/components/RecommendationPanel";
 import DeploymentTable from "@/components/DeploymentTable";
 import IntelligenceDashboard from "@/components/IntelligenceDashboard";
+import LiveTelemetryFeed from "@/components/LiveTelemetryFeed";
+import { fetchAPI } from "@/lib/api";
 
 interface SummaryData {
   globalRiskScore: number;
@@ -23,118 +25,98 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/dashboard/summary`)
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("API DATA:", data);
-        setSummary(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+    fetchAPI<SummaryData>("/api/dashboard/summary")
+      .then(setSummary)
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  // 🔥 Loading UI
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[60vh] text-lg text-muted">
-        Loading dashboard...
+      <div className="space-y-5">
+        <div className="h-5 w-48 bg-[#151a2e] rounded animate-pulse" />
+        <div className="grid grid-cols-3 gap-4">
+          {[1,2,3].map(i => <div key={i} className="h-28 bg-[#0f1422] rounded-lg border border-[#1c2333] animate-pulse" />)}
+        </div>
+        <div className="h-64 bg-[#0f1422] rounded-lg border border-[#1c2333] animate-pulse" />
       </div>
     );
   }
 
-  // 🔥 Dynamic Risk Level
-  const riskLevel =
-    (summary?.globalRiskScore ?? 0) > 70
-      ? "HIGH RISK"
-      : (summary?.globalRiskScore ?? 0) > 40
-        ? "MEDIUM RISK"
-        : "LOW RISK";
-
-  const riskColor =
-    (summary?.globalRiskScore ?? 0) > 70
-      ? "#ef4444"
-      : (summary?.globalRiskScore ?? 0) > 40
-        ? "#f59e0b"
-        : "#06b6d4";
+  const riskScore = summary?.globalRiskScore ?? 0;
+  const riskLevel = riskScore > 70 ? "HIGH" : riskScore > 40 ? "MEDIUM" : "LOW";
+  const riskColor = riskScore > 70 ? "#ef4444" : riskScore > 40 ? "#eab308" : "#22c55e";
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex justify-between items-end">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="page-title mb-1">Deployment Risk Prediction</h1>
-          <p className="text-muted">
-            Real-time AI analysis of CI/CD pipelines and code changes.
-          </p>
+          <h1 className="page-title">Deployment Intelligence</h1>
+          <p className="text-muted mt-0.5">Real-time risk analysis across CI/CD pipelines</p>
         </div>
-
-        <button className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-5 py-2.5 rounded-lg flex items-center gap-2 font-semibold text-sm transition-all shadow-lg shadow-cyan-900/20 active:scale-95">
-          <Plus size={18} />
-          Analyze New Deployment
+        <button className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md flex items-center gap-1.5 text-[13px] font-medium transition-colors active:scale-[0.98]">
+          <Plus size={15} />
+          New Analysis
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Stats Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
-          title="Global Risk Score"
-          value={`${summary?.globalRiskScore ?? 0}%`}
+          title="Risk Score"
+          value={`${riskScore}%`}
           status={riskLevel}
           statusColor={riskColor}
           icon={ShieldCheck}
-          trend={{ value: 12, isUp: false }}
         />
-
         <StatCard
-          title="Active Outages"
+          title="Active Incidents"
           value={(summary?.activeOutages ?? 0).toString()}
-          subtitle="All systems nominal"
+          subtitle={summary?.activeOutages === 0 ? "All systems nominal" : undefined}
           icon={AlertCircle}
         />
-
         <StatCard
           title="Success Rate"
           value={`${summary?.successRate ?? 0}%`}
           subtitle="Last 30 days"
           icon={CheckCircle2}
-          trend={{ value: 0.2, isUp: true }}
         />
       </div>
 
-      {/* Charts + Factors */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Risk Chart + Factors */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <RiskChart data={summary?.riskTrend || []} />
         </div>
-
         <div className="lg:col-span-1">
           <RiskFactors factors={summary?.riskFactors || []} />
         </div>
       </div>
 
-      {/* Advanced Intelligence Telemetry */}
-      <div className="w-full">
-        <IntelligenceDashboard />
+      {/* Intelligence + Live Telemetry */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <IntelligenceDashboard />
+        </div>
+        <div className="lg:col-span-1">
+          <LiveTelemetryFeed />
+        </div>
       </div>
 
       {/* Recommendations + Deployments */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1">
           <RecommendationPanel />
         </div>
-
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2">
           <div className="aegis-card">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-4">
               <h3 className="section-title">Recent Deployments</h3>
-              <button className="text-xs text-cyan-400 font-medium hover:underline">
-                View All
+              <button className="text-[12px] text-blue-400 hover:text-blue-300 font-medium transition-colors">
+                View all
               </button>
             </div>
-
             <DeploymentTable limit={5} />
           </div>
         </div>
