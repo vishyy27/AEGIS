@@ -3,6 +3,7 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import AICommandBar from "@/components/AICommandBar";
+import { WebSocketProvider } from "@/providers/WebSocketProvider";
 
 export const metadata: Metadata = {
   title: "AEGIS — Deployment Intelligence",
@@ -20,16 +21,18 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
       </head>
       <body className="overflow-hidden">
-        <div className="flex">
-          <Sidebar />
-          <div className="flex-1 ml-[220px] h-screen overflow-y-auto">
-            <Header />
-            <main className="mt-14 px-6 py-6">
-              <div className="max-w-[1400px] mx-auto">{children}</div>
-            </main>
+        <WebSocketProvider>
+          <div className="flex">
+            <Sidebar />
+            <div className="flex-1 ml-[220px] h-screen overflow-y-auto">
+              <Header />
+              <main className="mt-14 px-6 py-6">
+                <div className="max-w-[1400px] mx-auto">{children}</div>
+              </main>
+            </div>
           </div>
-        </div>
-        <AICommandBar />
+          <AICommandBar />
+        </WebSocketProvider>
       </body>
     </html>
   );
