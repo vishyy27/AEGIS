@@ -1,67 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { getWSUrl } from "./api";
-
-export interface WSMessage {
-  type: string;
-  [key: string]: unknown;
-}
+import { useEffect } from "react";
+import { useGlobalWebSocket } from "@/providers/WebSocketProvider";
+export type { WSMessage } from "@/providers/WebSocketProvider";
 
 export function useWebSocket(topics?: string[]) {
-  const [messages, setMessages] = useState<WSMessage[]>([]);
-  const [connected, setConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectRef = useRef<NodeJS.Timeout | null>(null);
-
-  const connect = useCallback(() => {
-    try {
-      const url = getWSUrl(topics);
-      const ws = new WebSocket(url);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setConnected(true);
-        if (reconnectRef.current) {
-          clearTimeout(reconnectRef.current);
-          reconnectRef.current = null;
-        }
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data) as WSMessage;
-          setLastMessage(data);
-          setMessages((prev) => [data, ...prev].slice(0, 100));
-        } catch { /* ignore parse errors */ }
-      };
-
-      ws.onclose = () => {
-        setConnected(false);
-        // Auto-reconnect after 3 seconds
-        reconnectRef.current = setTimeout(connect, 3000);
-      };
-
-      ws.onerror = () => {
-        ws.close();
-      };
-    } catch { /* ignore connection errors */ }
-  }, [topics]);
+  const { messages, lastMessage, connected, send, subscribe } = useGlobalWebSocket();
 
   useEffect(() => {
-    connect();
-    return () => {
-      wsRef.current?.close();
-      if (reconnectRef.current) clearTimeout(reconnectRef.current);
-    };
-  }, [connect]);
-
-  const send = useCallback((data: Record<string, unknown>) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(data));
+    if (topics && topics.length > 0) {
+      subscribe(topics);
     }
-  }, []);
+  }, [topics, subscribe]);
 
+  // Filter messages client-side if a component specific topic list was passed.
+  // Actually, for UI simplicity, we can just return all messages, or filter them based on topic prefix.
+  // The backend doesn't attach topic names directly to events usually, so we just return the stream.
   return { messages, lastMessage, connected, send };
 }
