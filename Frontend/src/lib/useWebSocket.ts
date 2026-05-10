@@ -5,7 +5,7 @@ import { useGlobalWebSocket } from "@/providers/WebSocketProvider";
 export type { WSMessage } from "@/providers/WebSocketProvider";
 
 export function useWebSocket(topics?: string[]) {
-  const { messages, lastMessage, connected, send, subscribe } = useGlobalWebSocket();
+  const { connected, send, subscribe } = useGlobalWebSocket();
 
   useEffect(() => {
     if (topics && topics.length > 0) {
@@ -13,8 +13,5 @@ export function useWebSocket(topics?: string[]) {
     }
   }, [topics, subscribe]);
 
-  // Filter messages client-side if a component specific topic list was passed.
-  // Actually, for UI simplicity, we can just return all messages, or filter them based on topic prefix.
-  // The backend doesn't attach topic names directly to events usually, so we just return the stream.
-  return { messages, lastMessage, connected, send };
+  return { connected, send };
 }

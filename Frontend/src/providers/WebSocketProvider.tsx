@@ -2,6 +2,11 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import { getWSUrl } from "@/lib/api";
+import { useTelemetryStore } from "@/store/telemetryStore";
+import { useOperationalStore, DeploymentEvent } from "@/store/operationalStore";
+import { queryClient } from "@/lib/queryClient";
+import { streamValidator } from "@/lib/realtime/streamValidator";
+import { reconciliationEngine } from "@/lib/realtime/reconciliationEngine";
 
 export interface WSMessage {
   type: string;
@@ -9,8 +14,6 @@ export interface WSMessage {
 }
 
 interface WebSocketContextType {
-  messages: WSMessage[];
-  lastMessage: WSMessage | null;
   connected: boolean;
   send: (data: Record<string, unknown>) => void;
   subscribe: (topics: string[]) => void;
@@ -19,14 +22,18 @@ interface WebSocketContextType {
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
 
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
-  const [messages, setMessages] = useState<WSMessage[]>([]);
   const [connected, setConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
   const [activeTopics, setActiveTopics] = useState<Set<string>>(new Set(["telemetry", "alerts", "deployments", "policy"]));
   
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
+  
+  const updateMetric = useTelemetryStore(state => state.updateMetric);
+  const batchUpdate = useTelemetryStore(state => state.batchUpdate);
+  const setConnectionStatus = useTelemetryStore(state => state.setConnectionStatus);
+  const upsertDeployment = useOperationalStore(state => state.upsertDeployment);
+  const addAnomaly = useOperationalStore(state => state.addAnomaly);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) {
@@ -37,9 +44,11 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       const url = getWSUrl(Array.from(activeTopics));
       const ws = new WebSocket(url);
       wsRef.current = ws;
+      setConnectionStatus('reconnecting');
 
       ws.onopen = () => {
         setConnected(true);
+        setConnectionStatus('connected');
         reconnectAttemptsRef.current = 0;
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current);
@@ -50,16 +59,45 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data) as WSMessage;
-          setLastMessage(data);
-          setMessages((prev) => {
-            const next = [data, ...prev];
-            return next.slice(0, 200); // Keep last 200 messages centrally
-          });
+          if (!streamValidator.validate(data)) return;
+          
+          // Generate a synthetic ID if absent for deduplication
+          const eventId = data.id || `${data.type}-${data.timestamp || Date.now()}-${Math.random()}`;
+          if (reconciliationEngine.isDuplicate(eventId as string)) return;
+
+          useTelemetryStore.getState().addMessage(data);
+          
+          switch (data.type) {
+            case "telemetry":
+              if (data.service && typeof data.service === 'string') {
+                updateMetric(data.service, data as any);
+              }
+              break;
+            case "telemetry_batch":
+              if (data.updates && typeof data.updates === 'object') {
+                batchUpdate(data.updates as any);
+              }
+              break;
+            case "deployment_update":
+              if (data.deployment) {
+                upsertDeployment(data.deployment as DeploymentEvent);
+                queryClient.invalidateQueries({ queryKey: ['deployments'] });
+              }
+              break;
+            case "anomaly_detected":
+              addAnomaly(data);
+              queryClient.invalidateQueries({ queryKey: ['anomalies'] });
+              break;
+            case "policy_violation":
+              queryClient.invalidateQueries({ queryKey: ['incidents'] });
+              break;
+          }
         } catch { /* ignore parse errors */ }
       };
 
       ws.onclose = () => {
         setConnected(false);
+        setConnectionStatus('disconnected');
         wsRef.current = null;
         
         // Exponential backoff reconnect
@@ -72,20 +110,17 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       };
 
       ws.onerror = () => {
-        // Just let onclose handle reconnect
         ws.close();
       };
     } catch { 
       // Handle edge cases
     }
-  }, [activeTopics]);
+  }, [activeTopics, updateMetric, batchUpdate, setConnectionStatus, upsertDeployment, addAnomaly]);
 
   useEffect(() => {
     connect();
     
-    // Check if we go back online
     const handleOnline = () => {
-      // Use ref or just call connect, connect() checks readyState anyway
       connect();
     };
     window.addEventListener("online", handleOnline);
@@ -120,14 +155,13 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       return changed ? next : prev;
     });
     
-    // If topics changed, reconnect
     if (changed && wsRef.current) {
-      wsRef.current.close(); // Triggers reconnect with new topics
+      wsRef.current.close(); 
     }
   }, []);
 
   return (
-    <WebSocketContext.Provider value={{ messages, lastMessage, connected, send, subscribe }}>
+    <WebSocketContext.Provider value={{ connected, send, subscribe }}>
       {children}
     </WebSocketContext.Provider>
   );
