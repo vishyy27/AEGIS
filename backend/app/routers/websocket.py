@@ -14,16 +14,18 @@ router = APIRouter(tags=["websocket"])
 
 
 @router.websocket("/ws/telemetry")
-async def telemetry_websocket(
+async def websocket_endpoint(
     websocket: WebSocket,
-    topics: Optional[str] = Query(None),
+    org_id: str = "00000000-0000-0000-0000-000000000000",
+    topics: Optional[str] = None
 ):
-    """WebSocket endpoint for real-time telemetry streaming."""
+    """WebSocket endpoint for real-time telemetry streaming scoped by org."""
     topic_list = topics.split(",") if topics else None
-    connection_id = await ws_manager.connect(websocket, topic_list)
-
+    connection_id = await ws_manager.connect(websocket, org_id, topic_list)
+    
     try:
         while True:
+            # Keep connection alive and handle client messages
             data = await websocket.receive_text()
             try:
                 msg = json.loads(data)

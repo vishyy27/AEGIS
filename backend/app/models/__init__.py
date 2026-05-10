@@ -32,3 +32,10 @@ from .operational_intelligence import (
     ForecastingResult,
     AdaptiveRecommendation,
 )
+
+# Phase 11.8: Enterprise Multi-Tenant Architecture
+from .organization import (
+    Organization,
+    OrganizationMember,
+    OrganizationInvitation,
+)

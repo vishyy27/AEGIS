@@ -70,6 +70,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Phase 11.8.1: Tenant Resolution Middleware
+from .middleware.tenant import TenantMiddleware
+app.add_middleware(TenantMiddleware)
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
@@ -188,4 +192,19 @@ app.include_router(assistant_router)
 app.include_router(fleet_router)
 app.include_router(phase11_incident_router)
 app.include_router(audit_router)
+
+# Phase 11.8.1: Enterprise Multi-Tenant Organization
+from .routers.organizations import router as organizations_router
+app.include_router(organizations_router)
+
+# Bootstrap default organization on startup
+from .database import SessionLocal
+from .services.organization_service import organization_service
+from .middleware.tenant import DEFAULT_ORG_ID
+try:
+    _db = SessionLocal()
+    organization_service.ensure_default_organization(_db, DEFAULT_ORG_ID)
+    _db.close()
+except Exception as _e:
+    logger.warning(f"Default org bootstrap skipped: {_e}")
 

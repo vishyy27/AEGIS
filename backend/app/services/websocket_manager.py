@@ -38,8 +38,8 @@ class ConnectionManager:
         self._lock = asyncio.Lock()
         self._counter = 0
 
-    async def connect(self, websocket: WebSocket, topics: Optional[list] = None) -> str:
-        """Accept a WebSocket connection and optionally subscribe to topics."""
+    async def connect(self, websocket: WebSocket, org_id: str, topics: Optional[list] = None) -> str:
+        """Accept a WebSocket connection, scope to organization, and subscribe to topics."""
         await websocket.accept()
         
         async with self._lock:
@@ -48,16 +48,18 @@ class ConnectionManager:
             self._connections[connection_id] = websocket
             self._connection_topics[connection_id] = set()
 
-            # Subscribe to requested topics (default: all)
+            # Subscribe to requested topics (scoped to organization)
             sub_topics = topics or ["deployments", "alerts", "telemetry", "incidents", "policy"]
             for topic in sub_topics:
-                if topic not in self._subscriptions:
-                    self._subscriptions[topic] = set()
-                self._subscriptions[topic].add(connection_id)
-                self._connection_topics[connection_id].add(topic)
+                # Scoped topic: org:{org_id}:{topic}
+                scoped_topic = f"org:{org_id}:{topic}"
+                if scoped_topic not in self._subscriptions:
+                    self._subscriptions[scoped_topic] = set()
+                self._subscriptions[scoped_topic].add(connection_id)
+                self._connection_topics[connection_id].add(scoped_topic)
 
         logger.info(
-            f"[WS] connected id={connection_id} topics={sub_topics} "
+            f"[WS] connected id={connection_id} org={org_id} topics={sub_topics} "
             f"total_connections={len(self._connections)}"
         )
         
@@ -65,6 +67,7 @@ class ConnectionManager:
         await self.send_personal(connection_id, {
             "type": "connection_established",
             "connection_id": connection_id,
+            "organization_id": org_id,
             "subscribed_topics": sub_topics,
             "timestamp": datetime.utcnow().isoformat(),
         })
@@ -76,11 +79,11 @@ class ConnectionManager:
         async with self._lock:
             # Remove from all topic subscriptions
             topics = self._connection_topics.pop(connection_id, set())
-            for topic in topics:
-                if topic in self._subscriptions:
-                    self._subscriptions[topic].discard(connection_id)
-                    if not self._subscriptions[topic]:
-                        del self._subscriptions[topic]
+            for scoped_topic in topics:
+                if scoped_topic in self._subscriptions:
+                    self._subscriptions[scoped_topic].discard(connection_id)
+                    if not self._subscriptions[scoped_topic]:
+                        del self._subscriptions[scoped_topic]
             
             self._connections.pop(connection_id, None)
 
@@ -99,14 +102,20 @@ class ConnectionManager:
                 logger.warning(f"[WS] send_failed id={connection_id} error={e}")
                 await self.disconnect(connection_id)
 
-    async def broadcast_to_topic(self, topic: str, message: dict):
-        """Broadcast a message to all connections subscribed to a topic."""
-        subscribers = self._subscriptions.get(topic, set()).copy()
+    async def broadcast_to_topic(self, topic: str, message: dict, org_id: Optional[str] = None):
+        """Broadcast a message to subscribers. If org_id provided, scopes to that tenant."""
+        # Determine scoped topic name
+        scoped_topic = f"org:{org_id}:{topic}" if org_id else topic
+        
+        subscribers = self._subscriptions.get(scoped_topic, set()).copy()
         if not subscribers:
             return
 
-        message["_topic"] = topic
+        message["_topic"] = topic  # Keep original topic in payload for frontend
+        message["_scoped_topic"] = scoped_topic
         message["_broadcast_at"] = datetime.utcnow().isoformat()
+        if org_id:
+            message["_organization_id"] = org_id
 
         disconnected = []
         for conn_id in subscribers:
@@ -123,7 +132,7 @@ class ConnectionManager:
 
         if disconnected:
             logger.info(
-                f"[WS] broadcast topic={topic} delivered={len(subscribers) - len(disconnected)} "
+                f"[WS] broadcast topic={scoped_topic} delivered={len(subscribers) - len(disconnected)} "
                 f"dropped={len(disconnected)}"
             )
 
