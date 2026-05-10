@@ -10,8 +10,19 @@ router = APIRouter(prefix="/api/deployments", tags=["deployments"])
 
 
 @router.get("/", response_model=List[DeploymentResponse])
-def list_deployments(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    deployments = db.query(Deployment).offset(skip).limit(limit).all()
+def list_deployments(skip: int = 0, limit: int = 100, search: str = None, db: Session = Depends(get_db)):
+    query = db.query(Deployment)
+    if search:
+        search_term = f"%{search}%"
+        from sqlalchemy import or_
+        query = query.filter(
+            or_(
+                Deployment.service.ilike(search_term),
+                Deployment.repo_name.ilike(search_term),
+                Deployment.commit_hash.ilike(search_term)
+            )
+        )
+    deployments = query.offset(skip).limit(limit).all()
     return deployments
 
 
