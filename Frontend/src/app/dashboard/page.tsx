@@ -14,10 +14,10 @@ import { fetchAPI } from "@/lib/api";
 
 interface SummaryData {
   globalRiskScore: number;
-  activeOutages: number;
+  incidentFrequency: number;
   successRate: number;
   riskTrend: number[];
-  riskFactors: { factor: string; impact: string }[];
+  topRiskFactors: { factor: string; impact: string }[];
 }
 
 export default function Dashboard() {
@@ -72,8 +72,8 @@ export default function Dashboard() {
         />
         <StatCard
           title="Active Incidents"
-          value={(summary?.activeOutages ?? 0).toString()}
-          subtitle={summary?.activeOutages === 0 ? "All systems nominal" : undefined}
+          value={(summary?.incidentFrequency ?? 0).toString()}
+          subtitle={summary?.incidentFrequency === 0 ? "All systems nominal" : undefined}
           icon={AlertCircle}
         />
         <StatCard
@@ -90,7 +90,7 @@ export default function Dashboard() {
           <RiskChart data={summary?.riskTrend || []} />
         </div>
         <div className="lg:col-span-1">
-          <RiskFactors factors={summary?.riskFactors || []} />
+          <RiskFactors factors={summary?.topRiskFactors || []} />
         </div>
       </div>
 
