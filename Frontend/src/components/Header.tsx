@@ -30,7 +30,7 @@ export default function Header() {
     setMounted(true);
     const checkHealth = async () => {
       try {
-        const res = await fetchAPI<{ status: string }>("/health", { skipCache: true });
+        const res = await fetchAPI<{ status: string }>("/health", { cache: "no-store" });
         setApiHealth(res.status ? "up" : "down");
       } catch {
         setApiHealth("down");

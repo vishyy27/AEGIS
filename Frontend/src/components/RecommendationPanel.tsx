@@ -20,7 +20,7 @@ const mockRecs: ActionableRec[] = [
 ];
 
 export default function RecommendationPanel() {
-  const { isConnected } = useGlobalWebSocket();
+  const { connected } = useGlobalWebSocket();
   const [recs, setRecs] = useState<ActionableRec[]>([]);
   const [analyzing, setAnalyzing] = useState(true);
 

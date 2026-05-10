@@ -28,36 +28,19 @@ const outcomeStyle: Record<string, string> = {
   pending: "text-[#4a5468] animate-pulse",
 };
 
-export default function DeploymentTable({ limit = 10 }: { limit?: number }) {
-  const [deployments, setDeployments] = useState<Deployment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { lastMessage, subscribe } = useGlobalWebSocket();
+import { useQuery } from '@tanstack/react-query';
 
-  useEffect(() => {
-    fetchAPI<Deployment[]>(`/api/deployments/?limit=${limit}`)
-      .then(setDeployments)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [limit]);
+export default function DeploymentTable({ limit = 10 }: { limit?: number }) {
+  const { subscribe } = useGlobalWebSocket();
+
+  const { data: deployments = [], isLoading: loading } = useQuery({
+    queryKey: ['deployments', limit],
+    queryFn: () => fetchAPI<Deployment[]>(`/api/deployments/?limit=${limit}`),
+  });
 
   useEffect(() => {
     subscribe(["deployments"]);
   }, [subscribe]);
-
-  useEffect(() => {
-    if (lastMessage?.type === "deployment_update" && lastMessage.data) {
-      const eventData = lastMessage.data as Deployment;
-      setDeployments(prev => {
-        const exists = prev.findIndex(d => d.id === eventData.id);
-        if (exists !== -1) {
-          const copy = [...prev];
-          copy[exists] = { ...copy[exists], ...eventData };
-          return copy;
-        }
-        return [eventData, ...prev].slice(0, limit);
-      });
-    }
-  }, [lastMessage, limit]);
 
   if (loading) {
     return (

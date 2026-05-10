@@ -13,7 +13,7 @@ interface StatCardProps {
   statusColor?: string;
 }
 
-export default function StatCard({ title, value, subtitle, icon: Icon, trend, status, statusColor }: StatCardProps) {
+const StatCard = React.memo(function StatCard({ title, value, subtitle, icon: Icon, trend, status, statusColor }: StatCardProps) {
   return (
     <div className="aegis-card relative overflow-hidden group">
       {/* Background ambient glow based on status if provided */}
@@ -57,4 +57,6 @@ export default function StatCard({ title, value, subtitle, icon: Icon, trend, st
       </div>
     </div>
   );
-}
+});
+
+export default StatCard;

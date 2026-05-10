@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Activity, AlertTriangle, ShieldCheck, Zap, Radio, Loader2 } from "lucide-react";
-import { useWebSocket, type WSMessage } from "@/lib/useWebSocket";
+import { type WSMessage } from "@/providers/WebSocketProvider";
 
 const typeConfig: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
   deployment_event: { icon: <Zap size={13} />, color: "text-blue-400", bg: "bg-blue-500/10" },
@@ -60,8 +60,12 @@ function EventItem({ msg }: { msg: WSMessage }) {
   );
 }
 
+import { useTelemetryStore } from "@/store/telemetryStore";
+
 export default function LiveTelemetryFeed() {
-  const { messages, connected } = useWebSocket(["telemetry", "alerts", "deployments", "policy"]);
+  const messages = useTelemetryStore(state => state.recentMessages);
+  const connectionStatus = useTelemetryStore(state => state.connectionStatus);
+  const connected = connectionStatus === 'connected';
   const [mounted, setMounted] = useState(false);
   
   useEffect(() => setMounted(true), []);
