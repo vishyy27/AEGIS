@@ -71,3 +71,16 @@ def get_recent_events(limit: int = 50, event_type: Optional[str] = None, db=Depe
     """Get recent deployment events for initial load."""
     event_types = [event_type] if event_type else None
     return event_stream.get_recent_events(db, limit=limit, event_types=event_types)
+
+
+@router.get("/api/telemetry/diagnostics")
+def get_realtime_diagnostics():
+    """Observability endpoint: queue depths, connection stats, worker health."""
+    from ..queues.queue_manager import queue_manager
+    return {
+        "websocket": {
+            "active_connections": ws_manager.active_connections,
+            "topic_stats": ws_manager.topic_stats,
+        },
+        "queues": queue_manager.stats,
+    }

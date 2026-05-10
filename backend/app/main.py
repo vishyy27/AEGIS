@@ -29,6 +29,10 @@ with engine.connect() as conn:
         "CREATE INDEX IF NOT EXISTS idx_deployments_repo_timestamp ON deployments(repo_name, timestamp DESC)",
         "CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts(timestamp)",
         "CREATE INDEX IF NOT EXISTS idx_alerts_affected_service ON alerts(affected_service)",
+        "CREATE INDEX IF NOT EXISTS idx_deployment_events_dep_id ON deployment_events(deployment_id)",
+        "CREATE INDEX IF NOT EXISTS idx_deployment_events_timestamp ON deployment_events(timestamp DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_anomaly_events_timestamp ON anomaly_events(timestamp DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_anomaly_events_service ON anomaly_events(service_name)",
     ]
     for idx in indexes:
         try:
@@ -37,7 +41,25 @@ with engine.connect() as conn:
             pass
     conn.commit()
 
-app = FastAPI(title=settings.PROJECT_NAME)
+from contextlib import asynccontextmanager
+from .services.operational.telemetry_dispatcher import telemetry_dispatcher
+from .realtime.broadcast_optimizer import broadcast_optimizer
+from .workers.event_worker import telemetry_worker, persistence_worker
+from .services.websocket_manager import ws_manager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Start telemetry batching dispatcher
+    telemetry_dispatcher.start()
+    # Start broadcast optimizer
+    broadcast_optimizer.start(ws_manager.broadcast_to_topic)
+    # Start background workers
+    telemetry_worker.start()
+    persistence_worker.start()
+    yield
+    # Cleanup logic can go here
+
+app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
 
 # CORS
 app.add_middleware(
