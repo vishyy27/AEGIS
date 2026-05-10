@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { getWSUrl } from "@/lib/api";
 import { useTelemetryStore } from "@/store/telemetryStore";
 import { useOperationalStore, DeploymentEvent } from "@/store/operationalStore";
+import { useOrganizationStore } from "@/store/organizationStore";
 import { queryClient } from "@/lib/queryClient";
 import { streamValidator } from "@/lib/realtime/streamValidator";
 import { reconciliationEngine } from "@/lib/realtime/reconciliationEngine";
@@ -34,6 +35,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const setConnectionStatus = useTelemetryStore(state => state.setConnectionStatus);
   const upsertDeployment = useOperationalStore(state => state.upsertDeployment);
   const addAnomaly = useOperationalStore(state => state.addAnomaly);
+  const currentOrg = useOrganizationStore(state => state.currentOrg);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) {
@@ -41,7 +43,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const url = getWSUrl(Array.from(activeTopics));
+      const url = getWSUrl(Array.from(activeTopics), currentOrg?.id);
       const ws = new WebSocket(url);
       wsRef.current = ws;
       setConnectionStatus('reconnecting');
@@ -115,7 +117,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     } catch { 
       // Handle edge cases
     }
-  }, [activeTopics, updateMetric, batchUpdate, setConnectionStatus, upsertDeployment, addAnomaly]);
+  }, [activeTopics, updateMetric, batchUpdate, setConnectionStatus, upsertDeployment, addAnomaly, currentOrg?.id]);
 
   useEffect(() => {
     connect();

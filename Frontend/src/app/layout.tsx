@@ -12,6 +12,11 @@ export const metadata: Metadata = {
   description: "AI-native deployment risk prediction and operational intelligence platform.",
 };
 
+import { QueryProvider } from "@/providers/QueryProvider";
+import { OrganizationProvider } from "@/providers/OrganizationProvider";
+import { WebSocketProvider } from "@/providers/WebSocketProvider";
+import ClientShell from "@/providers/ClientShell";
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -24,22 +29,25 @@ export default function RootLayout({
       </head>
       <body className="overflow-hidden">
         <QueryProvider>
-          <WebSocketProvider>
-            <ClientShell>
-              <div className="flex">
-                <Sidebar />
-                <div className="flex-1 ml-[220px] h-screen overflow-y-auto">
-                  <Header />
-                  <main className="mt-14 px-6 py-6">
-                    <div className="max-w-[1400px] mx-auto">{children}</div>
-                  </main>
+          <OrganizationProvider>
+            <WebSocketProvider>
+              <ClientShell>
+                <div className="flex">
+                  <Sidebar />
+                  <div className="flex-1 ml-[220px] h-screen overflow-y-auto">
+                    <Header />
+                    <main className="mt-14 px-6 py-6">
+                      <div className="max-w-[1400px] mx-auto">{children}</div>
+                    </main>
+                  </div>
                 </div>
-              </div>
-              <AICommandBar />
-            </ClientShell>
-          </WebSocketProvider>
+                <AICommandBar />
+              </ClientShell>
+            </WebSocketProvider>
+          </OrganizationProvider>
         </QueryProvider>
       </body>
     </html>
   );
 }
+
