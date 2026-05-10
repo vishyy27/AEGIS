@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { AlertCircle, CheckCircle2, Plus, ShieldCheck } from "lucide-react";
 
 import StatCard from "@/components/StatCard";
@@ -10,35 +10,21 @@ import RecommendationPanel from "@/components/RecommendationPanel";
 import DeploymentTable from "@/components/DeploymentTable";
 import IntelligenceDashboard from "@/components/IntelligenceDashboard";
 import LiveTelemetryFeed from "@/components/LiveTelemetryFeed";
-import { fetchAPI } from "@/lib/api";
-
-interface SummaryData {
-  globalRiskScore: number;
-  incidentFrequency: number;
-  successRate: number;
-  riskTrend: number[];
-  topRiskFactors: { factor: string; impact: string }[];
-}
+import ErrorBoundary from "@/components/system/ErrorBoundary";
+import SkeletonLoader from "@/components/system/SkeletonLoader";
+import { useDashboardSummary } from "@/hooks/queries";
 
 export default function Dashboard() {
-  const [summary, setSummary] = useState<SummaryData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchAPI<SummaryData>("/api/dashboard/summary")
-      .then(setSummary)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: summary, isLoading: loading } = useDashboardSummary();
 
   if (loading) {
     return (
       <div className="space-y-5">
         <div className="h-5 w-48 bg-[#151a2e] rounded animate-pulse" />
         <div className="grid grid-cols-3 gap-4">
-          {[1,2,3].map(i => <div key={i} className="h-28 bg-[#0f1422] rounded-lg border border-[#1c2333] animate-pulse" />)}
+          {[1,2,3].map(i => <SkeletonLoader key={i} variant="stat" />)}
         </div>
-        <div className="h-64 bg-[#0f1422] rounded-lg border border-[#1c2333] animate-pulse" />
+        <SkeletonLoader variant="chart" />
       </div>
     );
   }
@@ -87,7 +73,9 @@ export default function Dashboard() {
       {/* Risk Chart + Factors */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <RiskChart data={summary?.riskTrend || []} />
+          <ErrorBoundary fallbackTitle="Chart Error">
+            <RiskChart data={summary?.riskTrend || []} />
+          </ErrorBoundary>
         </div>
         <div className="lg:col-span-1">
           <RiskFactors factors={summary?.topRiskFactors || []} />
@@ -97,17 +85,23 @@ export default function Dashboard() {
       {/* Intelligence + Live Telemetry */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <IntelligenceDashboard />
+          <ErrorBoundary fallbackTitle="Intelligence Error">
+            <IntelligenceDashboard />
+          </ErrorBoundary>
         </div>
         <div className="lg:col-span-1">
-          <LiveTelemetryFeed />
+          <ErrorBoundary fallbackTitle="Telemetry Error">
+            <LiveTelemetryFeed />
+          </ErrorBoundary>
         </div>
       </div>
 
       {/* Recommendations + Deployments */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1">
-          <RecommendationPanel />
+          <ErrorBoundary fallbackTitle="Recommendations Error">
+            <RecommendationPanel />
+          </ErrorBoundary>
         </div>
         <div className="lg:col-span-2">
           <div className="aegis-card">
@@ -117,10 +111,13 @@ export default function Dashboard() {
                 View all
               </button>
             </div>
-            <DeploymentTable limit={5} />
+            <ErrorBoundary fallbackTitle="Deployments Error">
+              <DeploymentTable limit={5} />
+            </ErrorBoundary>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
