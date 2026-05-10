@@ -1,1 +1,1 @@
-from .tenant import TenantMiddleware, get_current_tenant, get_optional_tenant
+from .tenant import TenantMiddleware, get_current_tenant, get_optional_tenant, require_permissions

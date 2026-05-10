@@ -26,9 +26,10 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import SessionLocal
 from ..schemas.organization_schema import TenantContext
 from ..services.organization_service import organization_service
+from ..services.advanced_rbac_service import rbac_service
 
 logger = logging.getLogger("aegis.tenant")
 
@@ -66,12 +67,26 @@ class TenantMiddleware(BaseHTTPMiddleware):
         # In production: extract user_id from JWT token
         user_id = int(request.headers.get("X-User-ID", "1"))
 
+        # Determine permissions via RBAC service
+        permissions = set()
+        if org_id != DEFAULT_ORG_ID:
+            # We need a db session here
+            db = SessionLocal()
+            try:
+                permissions = rbac_service.resolve_user_permissions(db, org_id, user_id)
+            except Exception as e:
+                logger.error(f"[TenantMiddleware] Error resolving permissions: {e}")
+            finally:
+                db.close()
+        else:
+            permissions = {"*"} # Default org gets all permissions during migration
+
         # Store tenant context in request state
         request.state.tenant = TenantContext(
             organization_id=org_id,
             user_id=user_id,
-            role="admin",  # Simplified until full auth is wired
-            permissions=["*"],
+            role="resolved", # Legacy field, deprecated by permissions
+            permissions=list(permissions),
         )
 
         response = await call_next(request)
@@ -105,16 +120,21 @@ def get_optional_tenant(request: Request) -> Optional[TenantContext]:
     return getattr(request.state, "tenant", None)
 
 
-def require_role(*allowed_roles: str):
+def require_permissions(*required_permissions: str):
     """
-    Dependency factory that checks tenant role.
-    Usage: Depends(require_role("admin", "owner"))
+    Dependency factory that checks granular tenant permissions.
+    Usage: Depends(require_permissions("deployment:execute", "telemetry:view"))
     """
     def _check(tenant: TenantContext = Depends(get_current_tenant)):
-        if tenant.role not in allowed_roles and "*" not in tenant.permissions:
+        user_perms = set(tenant.permissions)
+        if "*" in user_perms:
+            return tenant
+            
+        missing = [p for p in required_permissions if p not in user_perms]
+        if missing:
             raise HTTPException(
                 status_code=403,
-                detail=f"Role '{tenant.role}' insufficient. Required: {allowed_roles}"
+                detail=f"Missing required permissions: {missing}"
             )
         return tenant
     return _check

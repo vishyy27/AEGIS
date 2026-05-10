@@ -197,14 +197,23 @@ app.include_router(audit_router)
 from .routers.organizations import router as organizations_router
 app.include_router(organizations_router)
 
-# Bootstrap default organization on startup
+# Phase 11.8.2: Advanced RBAC
+from .routers.rbac import router as rbac_router
+app.include_router(rbac_router)
+
+# Bootstrap default organization and RBAC on startup
 from .database import SessionLocal
 from .services.organization_service import organization_service
+from .services.advanced_rbac_service import rbac_service
 from .middleware.tenant import DEFAULT_ORG_ID
 try:
     _db = SessionLocal()
+    # 1. Bootstrap system permissions & templates
+    rbac_service.bootstrap_system_roles(_db)
+    
+    # 2. Ensure default org exists
     organization_service.ensure_default_organization(_db, DEFAULT_ORG_ID)
     _db.close()
 except Exception as _e:
-    logger.warning(f"Default org bootstrap skipped: {_e}")
+    logger.warning(f"Bootstrap skipped or failed: {_e}")
 

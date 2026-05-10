@@ -33,9 +33,17 @@ from .operational_intelligence import (
     AdaptiveRecommendation,
 )
 
-# Phase 11.8: Enterprise Multi-Tenant Architecture
+# Phase 11.8.1: Enterprise Multi-Tenant Architecture
 from .organization import (
     Organization,
     OrganizationMember,
     OrganizationInvitation,
+)
+
+# Phase 11.8.2: Advanced RBAC
+from .rbac import (
+    Permission,
+    Role,
+    RolePermission,
+    MemberRole,
 )
