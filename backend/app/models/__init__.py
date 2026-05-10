@@ -17,3 +17,18 @@ from .phase11_models import (
     ChatMessage,
     AuditLog,
 )
+
+# Phase 11.6: True Operational Intelligence
+from .operational_intelligence import (
+    CorrelatedDeployment,
+    DeploymentRelationship,
+    ServiceDependency,
+    AnomalyCluster,
+    AnomalyPattern,
+    AnomalyMemory,
+    OperationalMemory,
+    ServiceOperationalHistory,
+    DeploymentMemory,
+    ForecastingResult,
+    AdaptiveRecommendation,
+)
