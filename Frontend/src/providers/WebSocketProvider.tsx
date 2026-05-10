@@ -85,7 +85,8 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     
     // Check if we go back online
     const handleOnline = () => {
-      if (!connected) connect();
+      // Use ref or just call connect, connect() checks readyState anyway
+      connect();
     };
     window.addEventListener("online", handleOnline);
 
@@ -98,7 +99,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [connect, connected]);
+  }, [connect]);
 
   const send = useCallback((data: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
